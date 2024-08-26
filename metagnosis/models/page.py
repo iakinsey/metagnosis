@@ -8,7 +8,7 @@ class Page(BaseModel):
     title: str
     url: str
     score: int
-    text: str
+    path: str
     error: Optional[str]
     processed: bool
     created: datetime

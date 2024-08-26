@@ -1,25 +1,29 @@
 from asyncio import gather
 from datetime import datetime
 from hashlib import sha256
+from os.path import join
+from aiofiles import open
 from aiohttp import ClientSession
 from playwright.async_api import async_playwright, Browser
 from bs4 import BeautifulSoup
 from .base import Job
 from ..gateway.page import PageGateway
-from ..gateway.queue import QueueGateway
+from ..gateway.pdf import PDFGateway
 from ..log import log
 from ..models.page import Page
 from ..models.pdf import PDF
 
 
 class HackerNewsProcessorJob(Job):
+    storage_path: str
     user_agent: str
     page: PageGateway
-    queue: QueueGateway
+    pdf: PDFGateway
 
-    def __init__(self, user_agent: str, page: PageGateway, queue: QueueGateway):
+    def __init__(self, storage_path: str, user_agent: str, page: PageGateway, pdf: PDFGateway):
+        self.storage_path = storage_path
         self.page = page
-        self.queue = queue
+        self.pdf = pdf
         self.user_agent = user_agent
         self.hn_url = "https://news.ycombinator.com/"
 
@@ -54,7 +58,7 @@ class HackerNewsProcessorJob(Job):
         log.info(f"Processing entity {url}")
 
         if url.endswith(".pdf"):
-            await self.queue.download_pdf(url)
+            await self.pdf.download_pdf(url)
 
             return
 
@@ -89,13 +93,17 @@ class HackerNewsProcessorJob(Job):
 
         text = await page.content()
         now = datetime.now()
+        path = join(self.storage_path, id)
+
+        async with open(path, mode='w') as f:
+            await f.write(text)
 
         return Page(
             id=id,
             title=title,
             url=url,
             score=comment,
-            text=text,
+            path=path,
             error=err,
             processed=False,
             created=now,

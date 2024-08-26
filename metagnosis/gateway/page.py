@@ -9,7 +9,7 @@ class PageGateway(StorageGateway):
             title TEXT NOT NULL,
             url TEXT NOT NULL,
             score INTEGER NOT NULL,
-            text TEXT NOT NULL,
+            path TEXT NOT NULL,
             processed BOOLEAN NOT NULL,
             created DATETIME NOT NULL,
             updated DATETIME NOT NULL
@@ -43,7 +43,7 @@ class PageGateway(StorageGateway):
     async def upsert_pages(self, pages: list[Page]):
         query = """
             INSERT INTO Page
-            (id, title, url, score, text, processed, created, updated)
+            (id, title, url, score, path, processed, created, updated)
             VALUES
             (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
@@ -58,7 +58,7 @@ class PageGateway(StorageGateway):
             p.title,
             p.url,
             p.score,
-            p.text,
+            p.path,
             False,
             p.created,
             p.updated

@@ -4,7 +4,7 @@ from feedparser import parse
 from .base import Job
 from ..log import log
 from ..gateway.encoder import EncoderGateway
-from ..gateway.queue import QueueGateway
+from ..gateway.pdf import PDFGateway
 
 URL_TEMPLATE = "https://rss.arxiv.org/rss/{}"
 TOPICS = [
@@ -16,11 +16,11 @@ TOPICS = [
 
 
 class ArxivProcessorJob(Job):
-    queue: QueueGateway
+    pdf: PDFGateway
     download_limit: int = 10
 
-    def __init__(self, queue: QueueGateway):
-        self.queue = queue
+    def __init__(self, pdf: PDFGateway):
+        self.pdf = pdf 
  
     async def perform(self):
         await gather(*(
@@ -45,7 +45,7 @@ class ArxivProcessorJob(Job):
         sem = Semaphore(self.download_limit)
 
         await gather(*(
-            self.queue.download_pdf(url, sem)
+            self.pdf.download_pdf(url, sem)
             for url in urls
         ))
 

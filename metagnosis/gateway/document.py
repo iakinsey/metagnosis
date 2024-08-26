@@ -7,10 +7,13 @@ from ..models.document import Document
 
 
 class DocumentGateway(StorageGateway):
+    # TODO add data type (pdf/web) and a ranking:x
+
     SCHEMA = '''
         CREATE TABLE IF NOT EXISTS document USING vec0(
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
+            data_type TEXT NOT NULL,
             text TEXT NOT NULL,
             title TEXT NOT NULL,
             categories TEXT NOT NULL,
@@ -26,12 +29,13 @@ class DocumentGateway(StorageGateway):
 
         stmt = """
             INSERT INTO document
-            (id, path, text, title, categories, vector, processed, created, updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, path, data_type, text, title, categories, vector, processed, created, updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = [(
             d.id,
             d.path,
+            d.data_type,
             d.text,
             d.title,
             dumps(d.categories),

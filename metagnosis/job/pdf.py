@@ -4,7 +4,7 @@ from .base import Job
 from ..gateway.encoder import EncoderGateway
 from ..gateway.document import DocumentGateway
 from ..gateway.llm import LLMGateway
-from ..gateway.queue import QueueGateway
+from ..gateway.pdf import PDFGateway
 from ..log import log
 from ..models.document import Document
 from ..models.metadata import Metadata
@@ -14,19 +14,19 @@ from ..models.task import Task, TaskCategory
 class PDFProcessorJob(Job):
     document: DocumentGateway
     encoder: EncoderGateway
-    queue: QueueGateway
+    pdf: PDFGateway
     llm: LLMGateway
     limit: int
 
-    def __init__(self, document: DocumentGateway, queue: QueueGateway, encoder: EncoderGateway, llm: LLMGateway, limit=None):
+    def __init__(self, document: DocumentGateway, pdf: PDFGateway, encoder: EncoderGateway, llm: LLMGateway, limit=None):
         self.document = document
         self.encoder = encoder
         self.llm = llm
-        self.queue = queue
+        self.pdf = pdf
         self.limit = limit
 
     async def perform(self):
-        async with await self.queue.get_pdfs_for_processing(limit=self.limit) as pdfs:
+        async with await self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:
             documents = {
                 p.id: Document.from_pdf(p) for p in pdfs
             }
