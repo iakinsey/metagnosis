@@ -1,8 +1,9 @@
 from asyncio import gather, Semaphore
 from aiohttp import ClientSession
 from feedparser import parse
-from .base import Strategy
+from .base import Job
 from ..log import log
+from ..gateway.encoder import EncoderGateway
 from ..gateway.queue import QueueGateway
 
 URL_TEMPLATE = "https://rss.arxiv.org/rss/{}"
@@ -14,13 +15,13 @@ TOPICS = [
 ]
 
 
-class ArxivStrategy(Strategy):
+class ArxivProcessorJob(Job):
     queue: QueueGateway
     download_limit: int = 10
 
     def __init__(self, queue: QueueGateway):
         self.queue = queue
-        
+ 
     async def perform(self):
         await gather(*(
             self.process_rss(t)
