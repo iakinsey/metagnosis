@@ -8,6 +8,7 @@ class PDF(BaseModel):
     id: str
     path: str
     url: str
+    origin: str
     title: Optional[str]
     score: Optional[int]
     error: Optional[str]

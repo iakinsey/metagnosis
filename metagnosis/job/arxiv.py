@@ -45,7 +45,7 @@ class ArxivProcessorJob(Job):
         sem = Semaphore(self.download_limit)
 
         await gather(*(
-            self.pdf.download_pdf(url, sem)
+            self.pdf.download_pdf(url, "arxiv", sem)
             for url in urls
         ))
 

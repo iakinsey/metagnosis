@@ -1,5 +1,6 @@
+from contextlib import asynccontextmanager
 from json import dumps
-from typing import List
+from typing import AsyncGenerator, List
 from sqlite_vec import serialize_float32
 from .data_gateway import StorageGateway
 from ..log import log
@@ -7,13 +8,11 @@ from ..models.document import Document
 
 
 class DocumentGateway(StorageGateway):
-    # TODO add data type (pdf/web) and a ranking:x
-
     SCHEMA = '''
         CREATE TABLE IF NOT EXISTS document USING vec0(
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
-            data_type TEXT NOT NULL,
+            origin TEXT NOT NULL,
             path TEXT NOT NULL,
             title TEXT NOT NULL,
             score INT NOT NULL,
@@ -30,13 +29,13 @@ class DocumentGateway(StorageGateway):
 
         stmt = """
             INSERT INTO document
-            (id, path, data_type, path, title, score, categories, vector, processed, created, updated)
+            (id, path, origin, path, title, score, categories, vector, processed, created, updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = [(
             d.id,
             d.path,
-            d.data_type,
+            d.origin,
             d.path,
             d.title,
             d.score,
@@ -52,6 +51,13 @@ class DocumentGateway(StorageGateway):
         if commit:
             await self.db.commit()
 
-    async def get_documents_for_processing(self, limit=None):
-        # TODO
-        raise NotImplemented
+    @asynccontextmanager
+    async def get_documents_for_processing(self, limit=None) -> AsyncGenerator[List[Document], None]:
+        async with self.transaction():
+            log.info("Retrieving documents from the queue for processing")
+            docs = await self._get_docs(limit=limit)
+
+            yield docs
+
+            log.info("Deleting docs from the queue")
+            await self._delete_docs([i.id for i in docs])

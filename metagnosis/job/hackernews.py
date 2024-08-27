@@ -54,7 +54,7 @@ class HackerNewsProcessorJob(Job):
         log.info(f"Processing entity {url}")
 
         if url.endswith(".pdf"):
-            await self.pdf.download_pdf(url, title=title, score=comment)
+            await self.pdf.download_pdf(url, "Hacker News", title=title, score=comment)
 
             return
 
@@ -94,6 +94,7 @@ class HackerNewsProcessorJob(Job):
             id=id,
             path=path,
             url=url,
+            origin="Hacker News",
             title=title,
             score=comment,
             error=err,
