@@ -3,7 +3,6 @@ from concurrent.futures import ThreadPoolExecutor
 from json import loads
 from typing import Any
 from transformers import pipeline, Pipeline
-from ..log import log
 from ..models.metadata import Metadata
 
 METADATA_PROMPT = '''

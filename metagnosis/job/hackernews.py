@@ -2,27 +2,23 @@ from asyncio import gather
 from datetime import datetime
 from hashlib import sha256
 from os.path import join
-from aiofiles import open
 from aiohttp import ClientSession
-from playwright.async_api import async_playwright, Browser
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright, Browser
+from trafilatura import extract
 from .base import Job
-from ..gateway.page import PageGateway
 from ..gateway.pdf import PDFGateway
 from ..log import log
-from ..models.page import Page
 from ..models.pdf import PDF
 
 
 class HackerNewsProcessorJob(Job):
     storage_path: str
     user_agent: str
-    page: PageGateway
     pdf: PDFGateway
 
-    def __init__(self, storage_path: str, user_agent: str, page: PageGateway, pdf: PDFGateway):
+    def __init__(self, storage_path: str, user_agent: str, pdf: PDFGateway):
         self.storage_path = storage_path
-        self.page = page
         self.pdf = pdf
         self.user_agent = user_agent
         self.hn_url = "https://news.ycombinator.com/"
@@ -41,7 +37,7 @@ class HackerNewsProcessorJob(Job):
         if not len(titles) == len(urls) == len(comments):
             raise ValueError("Elements found are not equal")
         
-        unprepared = await self.page.get_page_processing_status(ids)
+        unprepared = await self.pdf.get_processing_status(ids)
 
         async with async_playwright() as p:
             browser = await p.chromium.launch()
@@ -52,13 +48,13 @@ class HackerNewsProcessorJob(Job):
                 if not processed 
             ))
 
-        await self.page.upsert_pages([i for i in pages if i])
+        await self.pdf.upsert_pages([i for i in pages if i])
 
     async def process_entity(self, browser: Browser, id: str, title: str, url: str, comment: int, needs_update: bool) -> PDF:
         log.info(f"Processing entity {url}")
 
         if url.endswith(".pdf"):
-            await self.pdf.download_pdf(url)
+            await self.pdf.download_pdf(url, title=title, score=comment)
 
             return
 
@@ -67,22 +63,22 @@ class HackerNewsProcessorJob(Job):
 
         return await self.new_page(browser, id, title, url, comment)
 
-    def update_page(self, id: str, title: str, url: str, comment: int) -> Page:
+    def update_page(self, id: str, title: str, url: str, comment: int) -> PDF:
         now = datetime.now()
 
-        return Page(
+        return PDF(
             id=id,
-            title=title,
+            path="",
             url=url,
+            title=title,
             score=comment,
-            text="",
             error=None,
-            processed=False,
             created=now,
-            updated=now
+            updated=now,
+            processed=False
         )
 
-    async def new_page(self, browser: Browser, id: str, title: str, url: str, comment: int) -> Page:
+    async def new_page(self, browser: Browser, id: str, title: str, url: str, comment: int) -> PDF:
         page = await browser.new_page()
         err = None
 
@@ -91,21 +87,40 @@ class HackerNewsProcessorJob(Job):
         except Exception as e:
             err = str(e)
 
-        text = await page.content()
         now = datetime.now()
-        path = join(self.storage_path, id)
+        path = await self.screenshot_page()
 
-        async with open(path, mode='w') as f:
-            await f.write(text)
-
-        return Page(
+        return PDF(
             id=id,
-            title=title,
-            url=url,
-            score=comment,
             path=path,
+            url=url,
+            title=title,
+            score=comment,
             error=err,
-            processed=False,
             created=now,
-            updated=now
+            updated=now,
+            processed=False
         )
+    
+    async def screenshot_page(self, page, id) -> str:
+        path = join(self.storage_path, id)
+        old_html = await page.evaluate("document.body.innerHTML")
+        new_html = extract(old_html, include_images=True, output_format='html')
+
+        await page.evaluate("""
+            (newBodyHtml) => {
+                const newBody = new DOMParser().parseFromString(newBodyHtml, 'text/html').body;
+                const scripts = document.body.querySelectorAll('script');
+                document.body.innerHTML = '';
+                document.body.append(...Array.from(newBody.childNodes));
+                document.body.append(...scripts);
+
+                const newHtmlContent = document.documentElement.outerHTML;
+                const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(newHtmlContent);
+                window.location.href = dataUrl;
+            }
+        """, new_html)
+
+        await page.pdf(path=path)
+
+        return path

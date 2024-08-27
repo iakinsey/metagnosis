@@ -9,7 +9,7 @@ from .gateway.page import PageGateway
 from .gateway.pdf import PDFGateway
 from .job.arxiv import ArxivProcessorJob
 from .job.hackernews import HackerNewsProcessorJob
-from .job.pdf import PDFProcessorJob
+from .job.doc_processor import DocumentProcessorJob
 
 
 async def main():
@@ -35,7 +35,7 @@ async def main():
     encoder = EncoderGateway()
     llm = LLMGateway()
     arxiv = ArxivProcessorJob(pdfg)
-    pdf = PDFProcessorJob(document, pdfg, encoder, llm, 10)
+    pdf = DocumentProcessorJob(document, pdfg, encoder, llm, 10)
     hn = HackerNewsProcessorJob(config.storage_path, config.user_agent, page, pdfg)
 
     await gather(
