@@ -33,6 +33,9 @@ class PublisherJob(Job):
 
         async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
+            # Generate front page with image
+            # Merge pdfs
+            # Send to publishing api 
     
     def get_relevant_docs(self, docs_multi) -> list[Document]:
         hn_docs, arxiv_docs = docs_multi
