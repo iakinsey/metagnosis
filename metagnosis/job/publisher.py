@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 
 from sklearn.cluster import KMeans
@@ -6,6 +8,7 @@ from pydantic import BaseModel
 from .base import Job
 from .arxiv import TOPICS
 from ..gateway.document import DocumentGateway
+from ..gateway.image_gen import ImageGenerationGateway
 from ..models.document import Document
 
 
@@ -21,9 +24,11 @@ class PublisherJob(Job):
     hn_limit: int = 25
     arxiv_limit: int = 25
     hn_rank_threshold: int = 100
+    image: ImageGenerationGateway
 
-    def __init__(self, document: DocumentGateway):
+    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway):
         self.document = document
+        self.image = image
 
     async def perform(self):
         args_multi = [
@@ -33,10 +38,16 @@ class PublisherJob(Job):
 
         async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
+            cover_page = self.get_cover_page()
             # Generate front page with image
             # Merge pdfs
             # Send to publishing api 
-    
+            start = self.last_run_time.strftime('%B %d').lstrip('0')
+            end = datetime.now().strftime('%B %d').lstrip('0')
+
+    def get_cover_page(self):
+        cover_image = self.image.generate_random_image()
+
     def get_relevant_docs(self, docs_multi) -> list[Document]:
         hn_docs, arxiv_docs = docs_multi
         arxiv_docs = self.filter_arxiv_docs(arxiv_docs)
