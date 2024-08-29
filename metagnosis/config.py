@@ -6,6 +6,7 @@ from os.path import join
 class Config(BaseModel):
     storage_path: str
     db_path: str
+    job_path: str
     user_agent: str
 
 
@@ -17,5 +18,6 @@ def get_config():
     return Config(
         storage_path=join(data_path, "storage"),
         db_path=join(data_path, "mg.db"),
+        job_path=join(data_path, "jobs.db"),
         user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     )

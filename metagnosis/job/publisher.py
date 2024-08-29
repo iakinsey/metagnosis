@@ -43,10 +43,11 @@ class PublisherJob(Job):
             # Merge pdfs
             # Send to publishing api 
             start = self.last_run_time.strftime('%B %d').lstrip('0')
-            end = datetime.now().strftime('%B %d').lstrip('0')
+            end = self.current_run_time.strftime('%B %d').lstrip('0')
 
     def get_cover_page(self):
         cover_image = self.image.generate_random_image()
+
 
     def get_relevant_docs(self, docs_multi) -> list[Document]:
         hn_docs, arxiv_docs = docs_multi

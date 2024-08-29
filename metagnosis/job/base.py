@@ -1,16 +1,18 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from asyncio import sleep
 from ..log import log
 
+
 class Job(ABC):
     INTERVAL = 60
+    current: datetime
+    last: datetime
 
     @abstractmethod
     async def perform(self):
         pass
 
-    async def start(self):
-        while 1:
-            log.info("Job {} tick".format(self.__class__.__name__))
-            await self.perform()
-            await sleep(self.INTERVAL)
+    def set_run_times(self, last: datetime, current: datetime):
+        self.last_run_time = last
+        self.current_run_time = current
