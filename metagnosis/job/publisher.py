@@ -1,10 +1,16 @@
-from datetime import datetime
+from os import remove
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import numpy as np
 
+from aioboto3 import Session
+from fpdf import FPDF
+from PIL import Image
+from PyPDF2 import PdfMerger
+from pydantic import BaseModel
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
-from pydantic import BaseModel
 from .base import Job
 from .arxiv import TOPICS
 from ..gateway.document import DocumentGateway
@@ -25,11 +31,16 @@ class PublisherJob(Job):
     arxiv_limit: int = 25
     hn_rank_threshold: int = 100
     image: ImageGenerationGateway
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    s3_bucket: str
 
-    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway):
+    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway, aws_creds: tuple[str, str], s3_bucket: str):
         self.document = document
         self.image = image
-
+        self.aws_access_key_id, self.aws_secret_access_key = aws_creds
+        self.s3_bucket = s3_bucket
+ 
     async def perform(self):
         args_multi = [
             ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit)
@@ -38,16 +49,91 @@ class PublisherJob(Job):
 
         async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
-            cover_page = self.get_cover_page()
-            # Generate front page with image
-            # Merge pdfs
-            # Send to publishing api 
+            cover_page_path = self.get_cover_page()
+            body = self.merge_pdfs(docs)
+            cover_path = await self.upload_to_s3(cover_page_path)
+            body_path = await self.upload_to_s3(body.name)
+            
+            await self.publish_book(cover_path, body_path)
+
+    async def publish_book(self, cover_path: str, body_path: str):
+        pass
+
+    async def uplodad_to_s3(self, file_name: str):
+        object_name = Path(file_name).name
+        session = Session(
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key
+        )
+        
+        async with session.client('s3') as s3_client:
+            await s3_client.upload_file(file_name, self.s3_bucket, object_name)
+        
+        await s3_client.put_object_acl(Bucket=self.s3_bucket, Key=object_name, ACL='public-read')
+
+        presigned_url = await s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': self.s3_bucket, 'Key': object_name},
+            ExpiresIn=604800
+        )
+
+        return presigned_url
+
+    def merge_pdfs(self, docs: list[Document]) -> NamedTemporaryFile:
+        temp_file = NamedTemporaryFile(delete=True, suffix='.pdf')
+        merger = PdfMerger()
+
+        for pdf_file in [d.path for d in docs]:
+            merger.append(pdf_file)
+
+        merger.write(temp_file)
+        merger.close()
+        temp_file.seek(0)
+
+        return temp_file
+
+    def get_cover_page(self) -> str:
+        image_path = self.image.generate_random_image()
+
+        try:
             start = self.last_run_time.strftime('%B %d').lstrip('0')
             end = self.current_run_time.strftime('%B %d').lstrip('0')
+            header_text = "Metagnosis"
+            subheader_text = f"{start} - {end}"
+            pdf = FPDF()
 
-    def get_cover_page(self):
-        cover_image = self.image.generate_random_image()
+            pdf.add_page()
 
+            max_font_size = 48
+            pdf.set_font("Arial", 'B', max_font_size)
+            text_width = pdf.get_string_width(header_text)
+            page_width = pdf.w - 20
+
+            while text_width > page_width:
+                max_font_size -= 1
+                pdf.set_font("Arial", 'B', max_font_size)
+                text_width = pdf.get_string_width(header_text)
+
+            pdf.cell(0, max_font_size / 2, header_text, ln=True, align="L")
+            pdf.set_font("Arial", 'I', 18)
+            pdf.cell(0, 15, subheader_text, ln=True, align="L")
+            pdf.ln(30)
+
+            image = Image.open(image_path)
+            img_width, img_height = image.size
+            max_size = min(pdf.w, pdf.h)
+            side_length = min(max_size, min(img_width, img_height))
+            x = (pdf.w - side_length) / 2
+            y = pdf.h - side_length
+
+            pdf.image(image_path, x=x, y=y, w=side_length, h=side_length)
+
+            temp_file = NamedTemporaryFile(delete=False, suffix=".pdf")
+            pdf.output(temp_file.name)
+        finally:
+            remove(image_path)
+
+        return temp_file.name
 
     def get_relevant_docs(self, docs_multi) -> list[Document]:
         hn_docs, arxiv_docs = docs_multi

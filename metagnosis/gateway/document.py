@@ -1,5 +1,6 @@
 from datetime import datetime
 from json import dumps
+from os import remove
 from typing import List
 from sqlite_vec import serialize_float32
 from .data_gateway import StorageGateway
@@ -114,6 +115,12 @@ class DocumentGateway(StorageGateway):
                     log.info("Document processing success")
                     log.info("Deleting docs from the queue")
                     await self._delete_docs([doc.id for docs in self.to_process for doc in docs])
+
+                    for doc in self.to_process:
+                        try:
+                            remove(doc.path)
+                        except:
+                            pass
 
                 await self.transaction().__aexit__(exc_type, exc_val, exc_tb)
             
