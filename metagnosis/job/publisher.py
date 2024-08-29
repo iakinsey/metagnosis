@@ -1,6 +1,8 @@
+from datetime import datetime
 from os import remove
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from uuid import uuid4
 
 import numpy as np
 
@@ -13,6 +15,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 from .base import Job
 from .arxiv import TOPICS
+from ..config import PublishCredentials
 from ..gateway.document import DocumentGateway
 from ..gateway.image_gen import ImageGenerationGateway
 from ..models.document import Document
@@ -34,12 +37,14 @@ class PublisherJob(Job):
     aws_access_key_id: str
     aws_secret_access_key: str
     s3_bucket: str
+    publish_creds: PublishCredentials
 
-    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway, aws_creds: tuple[str, str], s3_bucket: str):
+    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway, aws_creds: tuple[str, str], s3_bucket: str, publish_creds: PublishCredentials):
         self.document = document
         self.image = image
         self.aws_access_key_id, self.aws_secret_access_key = aws_creds
         self.s3_bucket = s3_bucket
+        self.publish_creds = publish_creds
  
     async def perform(self):
         args_multi = [
@@ -57,7 +62,39 @@ class PublisherJob(Job):
             await self.publish_book(cover_path, body_path)
 
     async def publish_book(self, cover_path: str, body_path: str):
-        pass
+        external_id = str(uuid4())
+        payload = {
+            "contact_email": self.publish_creds.email,
+            "external_id": external_id,
+            "line_items": [
+                {
+                    "external_id": external_id,
+                    "printable_normalization": {
+                        "cover": {
+                            "source_url": cover_path
+                        },
+                        "interior": {
+                            "source_url": body_path
+                        },
+                        "pod_package_id": self.publish_creds.package_id
+                    },
+                    "quantity": 1,
+                    "title": f"Metagnosis {datetime.now().strftime('%Y-%m-%d')}"
+                }
+            ],
+            "production_delay": 120,
+            "shipping_address": {
+                "city": self.publish_creds.city,
+                "country_code": self.publish_creds.country_code,
+                "name": self.publish_creds.name,
+                "phone_number": self.publish_creds.phone_number,
+                "postcode": self.publish_creds.postcode,
+                "state_code": self.publish_creds.state_code,
+                "street1": self.publish_creds.street1,
+                "street2": self.publish_creds.street2
+            },
+            "shipping_level": self.publish_creds.shipping_level
+        }
 
     async def uplodad_to_s3(self, file_name: str):
         object_name = Path(file_name).name

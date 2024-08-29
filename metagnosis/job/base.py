@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from asyncio import sleep
-from ..log import log
 
 
 class Job(ABC):
