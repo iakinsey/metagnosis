@@ -17,7 +17,7 @@ class JobServer:
         schema = '''
         CREATE TABLE IF NOT EXISTS job (
             name TEXT PRIMARY KEY,
-            next_run_time DATETIME NOT NULL
+            next_run_time INT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_job_next_run_time ON job(next_run_time);
         CREATE INDEX IF NOT EXISTS idx_job_name ON job(name);
@@ -44,7 +44,9 @@ class JobServer:
         WHERE job.next_run_time < excluded.next_run_time;
         '''
 
-        next_run_time = datetime.now() + timedelta(seconds=job.INTERVAL)
+        dt = datetime.now() + timedelta(seconds=job.INTERVAL)
+        next_run_time = int(dt.timestamp())
+
         await self.db.execute(query, (job.__class__.__name__, next_run_time))
         await self.db.commit()
 
@@ -53,12 +55,13 @@ class JobServer:
         SELECT
             name, next_run_time
         FROM job
-        WHERE next_run_time >= CURRENT_TIMESTAMP
+        WHERE next_run_time >= ?
         '''
 
         results = []
+        now = int(datetime.now().timestamp())
 
-        async with self.db.execute(query) as cursor:
+        async with self.db.execute(query, now) as cursor:
             async for row in cursor:
                 results.append(self.job_map[row[0]], row[1])
             

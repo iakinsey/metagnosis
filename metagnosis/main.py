@@ -1,6 +1,11 @@
 from asyncio import gather, new_event_loop, Lock
+from os import _exit
+from signal import signal, SIGTERM, SIGINT
+from time import sleep
+
 from aiosqlite import connect
 from sqlite_vec import loadable_path
+
 from .config import get_config
 from .gateway.document import DocumentGateway
 from .gateway.encoder import EncoderGateway
@@ -45,6 +50,12 @@ async def main():
 
     await server.start()
 
+def signal_handler(signum, frame):
+    _exit(1)
+
 if __name__ == '__main__':
+    signal(SIGTERM, signal_handler)
+    signal(SIGINT, signal_handler)
+
     loop = new_event_loop()
     loop.run_until_complete(main())
