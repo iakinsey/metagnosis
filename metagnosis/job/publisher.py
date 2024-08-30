@@ -12,7 +12,7 @@ from aiohttp import ClientResponseError, ClientSession
 from fpdf import FPDF
 from PIL import Image
 from PyPDF2 import PdfMerger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 from .base import Job
@@ -28,6 +28,7 @@ class ArxivClusters(BaseModel):
     vectors: np.array
     kmeans: KMeans
     clusters: int = len(TOPICS)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class PublisherJob(Job):

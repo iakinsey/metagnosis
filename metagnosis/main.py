@@ -1,4 +1,4 @@
-from asyncio import gather, Lock
+from asyncio import gather, new_event_loop, Lock
 from aiosqlite import connect
 from sqlite_vec import loadable_path
 from .config import get_config
@@ -44,3 +44,7 @@ async def main():
     server = JobServer(job_conn, jobs)
 
     await server.start()
+
+if __name__ == '__main__':
+    loop = new_event_loop()
+    loop.run_until_complete(main())
