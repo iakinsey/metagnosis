@@ -1,4 +1,5 @@
 from datetime import datetime
+from json import dumps
 from os import remove
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -7,6 +8,7 @@ from uuid import uuid4
 import numpy as np
 
 from aioboto3 import Session
+from aiohttp import ClientResponseError, ClientSession
 from fpdf import FPDF
 from PIL import Image
 from PyPDF2 import PdfMerger
@@ -15,7 +17,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 from .base import Job
 from .arxiv import TOPICS
-from ..config import PublishCredentials
+from ..config import get_config, PublishCredentials
 from ..gateway.document import DocumentGateway
 from ..gateway.image_gen import ImageGenerationGateway
 from ..models.document import Document
@@ -39,12 +41,15 @@ class PublisherJob(Job):
     s3_bucket: str
     publish_creds: PublishCredentials
 
-    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway, aws_creds: tuple[str, str], s3_bucket: str, publish_creds: PublishCredentials):
+    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway):
+        config = get_config()
         self.document = document
         self.image = image
-        self.aws_access_key_id, self.aws_secret_access_key = aws_creds
-        self.s3_bucket = s3_bucket
-        self.publish_creds = publish_creds
+        self.aws_access_key_id = config.aws_access_key_id
+        self.aws_secret_access_key = config.aws_secret_access_key
+        self.s3_bucket = config.s3_bucket
+        self.publish_creds = config.publish_creds
+        self.lulu_auth = config.lulu_auth
  
     async def perform(self):
         args_multi = [
@@ -61,7 +66,28 @@ class PublisherJob(Job):
             
             await self.publish_book(cover_path, body_path)
 
-    async def publish_book(self, cover_path: str, body_path: str):
+    async def get_lulu_auth(self) -> str:
+        url = "https://api.lulu.com/auth/realms/glasstree/protocol/openid-connect/token"
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': self.lulu_auth
+        }
+        data = {
+            'grant_type': 'client_credentials'
+        }
+
+        async with ClientSession() as session:
+            async with session.post(url, headers=headers, data=data) as response:
+                return await response.json()['access_token']
+
+    async def publish_book(self, cover_path: str, body_path: str) -> str:
+        auth = await self.get_lulu_auth()
+        url = "https://api.lulu.com/print-jobs/"
+        headers = {
+            'Authorization': 'Check Authentication menu',
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json'
+        }
         external_id = str(uuid4())
         payload = {
             "contact_email": self.publish_creds.email,
@@ -95,6 +121,15 @@ class PublisherJob(Job):
             },
             "shipping_level": self.publish_creds.shipping_level
         }
+
+        async with ClientSession() as session:
+            async with session.post(url, headers=headers, data=dumps(payload)) as response:
+                try:
+                    response.raise_for_status()
+                except ClientResponseError as e:
+                    error_response = await response.text()
+                    raise RuntimeError(f"Lulu Error: {e.status}, Details: {error_response}")
+
 
     async def uplodad_to_s3(self, file_name: str):
         object_name = Path(file_name).name

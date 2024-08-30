@@ -4,9 +4,8 @@ from os.path import join
 
 
 class PublishCredentials(BaseModel):
-    shipping_level: str
     email: str
-    package_id: str
+    package_id: str = "0850X1100FCSTDPB080CW444GXX"
     name: str
     street1: str
     street2: str
@@ -22,7 +21,11 @@ class Config(BaseModel):
     db_path: str
     job_path: str
     user_agent: str
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    s3_bucket: str
     publish_creds: PublishCredentials
+
 
 
 def get_config():
