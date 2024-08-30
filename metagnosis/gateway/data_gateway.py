@@ -16,7 +16,7 @@ class StorageGateway(ABC):
         self.storage_path = storage_path
 
     @classmethod
-    async def new(cls, db: Connection, storage_path: str):
+    async def new(cls, db: Connection, storage_path: str, process_lock: Lock):
         makedirs(storage_path, exist_ok=True)
 
         for q in cls.SCHEMA.split(";"):
@@ -26,7 +26,7 @@ class StorageGateway(ABC):
             await db.execute(q)
             await db.commit()
 
-        return cls(db, storage_path)
+        return cls(db, storage_path, process_lock)
 
     @property
     @abstractmethod

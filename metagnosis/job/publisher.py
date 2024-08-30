@@ -3,6 +3,7 @@ from json import dumps
 from os import remove
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any
 from uuid import uuid4
 
 import numpy as np
@@ -25,7 +26,7 @@ from ..models.document import Document
 
 class ArxivClusters(BaseModel):
     ids: list[str]
-    vectors: np.array
+    vectors: Any
     kmeans: KMeans
     clusters: int = len(TOPICS)
     model_config = ConfigDict(arbitrary_types_allowed=True)

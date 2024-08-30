@@ -10,7 +10,7 @@ from ..models.document import Document
 
 class DocumentGateway(StorageGateway):
     SCHEMA = '''
-        CREATE TABLE IF NOT EXISTS document USING vec0(
+        CREATE TABLE IF NOT EXISTS document (
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
             origin TEXT NOT NULL,

@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from os import getcwd, makedirs
 from os.path import join
 
+data_path = join(getcwd(), "data")
 
 class PublishCredentials(BaseModel):
     email: str
@@ -17,26 +18,20 @@ class PublishCredentials(BaseModel):
 
 
 class Config(BaseModel):
-    storage_path: str
-    db_path: str
-    job_path: str
-    user_agent: str
+    storage_path: str = data_path
+    db_path: str = join(data_path, "mg.db")
+    job_path: str = join(data_path, "jobs.db")
+    user_agent: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     aws_access_key_id: str
     aws_secret_access_key: str
     s3_bucket: str
     publish_creds: PublishCredentials
 
 
+def get_config() -> Config:
+    config_json = open(join(getcwd(), "config.json"), 'r').read().strip()
+    config = Config.model_validate_json(config_json)
 
-def get_config():
-    data_path = join(getcwd(), "data")
+    makedirs(config.storage_path, exist_ok=True)
 
-    makedirs(data_path, exist_ok=True)
-
-    return Config(
-        storage_path=join(data_path, "storage"),
-        db_path=join(data_path, "mg.db"),
-        job_path=join(data_path, "jobs.db"),
-        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-    )
-
+    return config

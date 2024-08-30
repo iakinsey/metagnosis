@@ -4,7 +4,7 @@ from sqlite_vec import loadable_path
 from .config import get_config
 from .gateway.document import DocumentGateway
 from .gateway.encoder import EncoderGateway
-from .gateway.llm import LLMGateway
+#from .gateway.llm import LLMGateway
 from .gateway.pdf import PDFGateway
 from .job.arxiv import ArxivProcessorJob
 from .job.hackernews import HackerNewsProcessorJob
@@ -22,22 +22,22 @@ async def main():
     await conn.load_extension(loadable_path())
     await conn.enable_load_extension(False)
 
-    pdf = await PDFGateway.new(
-        conn,
-        config.storage_path,
-        process_lock
-    )
     document = await DocumentGateway.new(
         conn,
         config.storage_path,
         process_lock
     )
+    pdf = await PDFGateway.new(
+        conn,
+        config.storage_path,
+        process_lock
+    )
     encoder = EncoderGateway()
-    llm = LLMGateway()
+    #llm = LLMGateway()
     jobs = [
         ArxivProcessorJob(pdf),
         #HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
-        #DocumentProcessorJob(document, pdf, encoder, llm, 10),
+        #DocumentProcessorJob(document, pdf, encoder, 10),
         #PublisherJob(document)
     ]
 

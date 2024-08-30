@@ -32,7 +32,7 @@ class JobServer:
         await self.db.commit()
 
         for job in self.job_map.values():
-            self.update_next_run_time(job)
+            await self.update_next_run_time(job)
 
     async def update_next_run_time(self, job: Job):
         query = '''
