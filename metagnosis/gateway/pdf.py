@@ -89,7 +89,7 @@ class PDFGateway(StorageGateway):
         log.info(f"Downloading PDF {url}")
 
         if await self.pdf_exists(url):
-            await self._update_pdf(url, title=title, score=score)
+            await self.update_pdf(url, title=title, score=score)
             return
 
         if sem:
@@ -150,9 +150,12 @@ class PDFGateway(StorageGateway):
                 pdf.id,
                 pdf.path,
                 pdf.url,
-                pdf.processed,
+                pdf.title,
+                pdf.score,
+                pdf.error,
                 pdf.created,
                 pdf.updated,
+                pdf.processed,
                 pdf.origin
             )
         )
