@@ -9,18 +9,20 @@ from .gateway.pdf import PDFGateway
 from .job.arxiv import ArxivProcessorJob
 from .job.hackernews import HackerNewsProcessorJob
 from .job.doc_processor import DocumentProcessorJob
-
+from .job.publisher import PublisherJob
+from .util.job_server import JobServer
 
 async def main():
     config = get_config()
     conn = await connect(config.db_path)
+    job_conn = await connect(config.job_path)
     process_lock = Lock()
 
     await conn.enable_load_extension(True)
     await conn.load_extension(loadable_path())
     await conn.enable_load_extension(False)
 
-    pdfg = await PDFGateway.new(
+    pdf = await PDFGateway.new(
         conn,
         config.storage_path,
         process_lock
@@ -32,12 +34,13 @@ async def main():
     )
     encoder = EncoderGateway()
     llm = LLMGateway()
-    arxiv = ArxivProcessorJob(pdfg)
-    pdf = DocumentProcessorJob(document, pdfg, encoder, llm, 10)
-    hn = HackerNewsProcessorJob(config.storage_path, config.user_agent, pdfg)
+    jobs = [
+        ArxivProcessorJob(pdf),
+        DocumentProcessorJob(document, pdf, encoder, llm, 10),
+        HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
+        PublisherJob(document)
+    ]
 
-    await gather(
-        arxiv.start(),
-        pdf.start(),
-        hn.start()
-    )
+    server = JobServer(job_conn, jobs)
+
+    await server.start()

@@ -66,6 +66,7 @@ class JobServer:
 
     async def start(self):
         await self.initialize_job_db()
+
         now = datetime.now()
 
         while 1:

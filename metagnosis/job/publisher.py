@@ -41,10 +41,10 @@ class PublisherJob(Job):
     s3_bucket: str
     publish_creds: PublishCredentials
 
-    def __init__(self, document: DocumentGateway, image: ImageGenerationGateway):
+    def __init__(self, document: DocumentGateway):
         config = get_config()
         self.document = document
-        self.image = image
+        self.image = ImageGenerationGateway()
         self.aws_access_key_id = config.aws_access_key_id
         self.aws_secret_access_key = config.aws_secret_access_key
         self.s3_bucket = config.s3_bucket
@@ -84,7 +84,7 @@ class PublisherJob(Job):
         auth = await self.get_lulu_auth()
         url = "https://api.lulu.com/print-jobs/"
         headers = {
-            'Authorization': 'Check Authentication menu',
+            'Authorization': f'Bearer {auth}',
             'Cache-Control': 'no-cache',
             'Content-Type': 'application/json'
         }
@@ -128,6 +128,7 @@ class PublisherJob(Job):
                     response.raise_for_status()
                 except ClientResponseError as e:
                     error_response = await response.text()
+
                     raise RuntimeError(f"Lulu Error: {e.status}, Details: {error_response}")
 
 
