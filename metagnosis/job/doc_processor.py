@@ -37,19 +37,19 @@ class DocumentProcessorJob(Job):
                 p.id: Document.from_pdf(p) for p in pdfs
             })
 
-    async def process_documents(self, documents: map[str, Document]):
+    async def process_documents(self, documents: dict[str, Document]):
         tasks = await as_completed(
             Task.wrap(
                 self.encoder.encode([(d.id, d.text) for d in documents.values()]),
                 TaskCategory.VECTORIZE_TEXT
             ),
-            *[
-                Task.Wrap(
-                    self.llm.extract_metadata(d.id, d.text),
-                    TaskCategory.EXTRACT_METADATA,
-                    id=d.id
-                ) for d in documents.values()
-            ]
+            #*[
+            #    Task.Wrap(
+            #        self.llm.extract_metadata(d.id, d.text),
+            #        TaskCategory.EXTRACT_METADATA,
+            #        id=d.id
+            #    ) for d in documents.values()
+            #]
         )
 
         for coro in as_completed(tasks):

@@ -53,7 +53,7 @@ class PublisherJob(Job):
  
     async def perform(self):
         args_multi = [
-            ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit)
+            ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit),
             ("arxiv", self.last_run_time, 0, None)
         ]
 
