@@ -111,13 +111,13 @@ class PDFGateway(StorageGateway):
                 async with open(path, 'wb') as f:
                     async for chunk in response.content.iter_any():
                         await f.write(chunk)
-        
+
         await self.add_pdf(
             PDF(
                 id=pdf_id,
                 path=path,
-                origin=origin,
                 url=url,
+                origin=origin,
                 title=title,
                 score=score,
                 created=now,

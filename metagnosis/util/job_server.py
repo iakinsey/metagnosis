@@ -61,9 +61,9 @@ class JobServer:
         results = []
         now = int(datetime.now().timestamp())
 
-        async with self.db.execute(query, now) as cursor:
+        async with self.db.execute(query, (now,)) as cursor:
             async for row in cursor:
-                results.append(self.job_map[row[0]], row[1])
+                results.append((self.job_map[row[0]], row[1]))
             
         return results
 

@@ -9,13 +9,13 @@ class PDF(BaseModel):
     path: str
     url: str
     origin: str
-    title: Optional[str]
-    score: Optional[int]
-    error: Optional[str]
+    title: Optional[str] = None
+    score: Optional[int] = None
+    error: Optional[str] = None
     created: datetime
     updated: datetime
     processed: bool
-    text: Optional[str]
+    text: Optional[str] = None
 
     def hydrate_text(self):
         text = ""
