@@ -26,6 +26,7 @@ async def main():
     await conn.enable_load_extension(True)
     await conn.load_extension(loadable_path())
     await conn.enable_load_extension(False)
+    await conn.execute('PRAGMA journal_mode=WAL;')
 
     document = await DocumentGateway.new(
         conn,

@@ -28,36 +28,21 @@ class DocumentProcessorJob(Job):
         async with self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:
             loop = get_running_loop()
 
-            await gather(*(
+            await gather(*[
                 loop.run_in_executor(self.text_executor, p.hydrate_text) for p in pdfs
-            ))
+            ])
             await self.process_documents({
                 p.id: Document.from_pdf(p) for p in pdfs
             })
 
     async def process_documents(self, documents: dict[str, Document]):
-        tasks = await as_completed(
-            Task.wrap(
-                self.encoder.encode([(d.id, d.text) for d in documents.values()]),
-                TaskCategory.VECTORIZE_TEXT
-            ),
-        )
+        log.info("Encoding documents")
 
-        for coro in as_completed(tasks):
-            task: Task = await coro 
+        encodings = await self.encoder.encode([(d.id, d.text) for d in documents.values()])
 
-            if task.category == TaskCategory.VECTORIZE_TEXT:
-                await self.process_vectorize(task, documents)
+        for id, vector in encodings:
+            documents[id].vector = vector
 
-        await self.document.save_documents(
-            [d for d in documents if d.title is not None]
-        )
+        log.info("Encoding complete")
 
-    def process_vectorize(self, task: Task, docs: Document):
-        if task.error:
-            raise task.error
-
-        results: List[Tuple[str, List[float]]] = task.result
-
-        for id, vector in results:
-            docs[id].vector = vector
+        await self.document.save_documents([d for d in documents.values()])

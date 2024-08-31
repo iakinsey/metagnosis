@@ -47,8 +47,8 @@ class PDFGateway(StorageGateway):
         query = f'''
         UPDATE
             pdf
-        SET processed = TRUE
-        SET updated = CURRENT_TIMESTAMP
+        SET processed = TRUE,
+        updated = CURRENT_TIMESTAMP
         WHERE id IN ({placeholders})
         '''
 

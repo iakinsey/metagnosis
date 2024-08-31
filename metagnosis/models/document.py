@@ -6,9 +6,9 @@ from .pdf import PDF
 class Document(BaseModel):
     id: str
     path: str
+    origin: str
     data_type: str
     path: str
-    title: str
     score: int
     categories: List[str]
     vector: List[float]
@@ -25,6 +25,7 @@ class Document(BaseModel):
             id=pdf.id,
             path=pdf.path,
             data_type="pdf",
+            origin=pdf.origin,
             score=0,
             processed=False,
             text=pdf.text,
