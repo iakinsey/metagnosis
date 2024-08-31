@@ -28,7 +28,7 @@ class ArxivClusters(BaseModel):
     ids: list[str]
     vectors: Any
     kmeans: KMeans
-    clusters: int = len(TOPICS)
+    clusters: int
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -59,7 +59,7 @@ class PublisherJob(Job):
             ("arxiv", self.last_run_time, 0, None)
         ]
 
-        async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
+        async with await self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
             cover_page_path = self.get_cover_page()
             body = self.merge_pdfs(docs)
@@ -229,14 +229,16 @@ class PublisherJob(Job):
         data = {d.id: d.vector for d in docs}
         ids = list(data.keys())
         vectors = np.array(list(data.values()))
-        kmeans = KMeans(n_clusters=ArxivClusters.clusters, random_state=56)
+        clusters = len(TOPICS)
+        kmeans = KMeans(n_clusters=clusters, random_state=56)
 
         kmeans.fit(vectors)
 
         return ArxivClusters(
             ids=ids,
             vectors=vectors,
-            kmeans=kmeans
+            kmeans=kmeans,
+            clusters=clusters
         )
     
     def get_intersting_arxiv_papers(self, arxiv: ArxivClusters) -> set[str]:

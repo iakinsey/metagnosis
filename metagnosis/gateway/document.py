@@ -45,42 +45,47 @@ class DocumentGateway(StorageGateway):
         if commit:
             await self.db.commit()
 
-    async def _get_docs(self, origin: str, after: datetime, rank_threshold: int, limit: int = None) -> list[Document]:
+    async def _get_docs(self, origin: str, after: datetime, rank_threshold: int, limit: int) -> list[Document]:
         query = '''
         SELECT
             id, path, origin, score, vector, processed, created, updated
         FROM document
         WHERE processed = FALSE
         AND created > ?
-        AND rank_threshold >= ?
+        AND score >= ?
         AND origin = ?
         ORDER BY score DESC
         '''
 
         if limit:
             query += f"\n LIMIT {limit}"
+        
+        results = []
 
-        async with self.db.execute(query, after, rank_threshold, origin) as cursor:
-            return [
-                Document(
-                    id=row[0],
-                    path=row[1],
-                    origin=row[2],
-                    score=row[3],
-                    vector=row[4],
-                    processed=row[5],
-                    created=row[6],
-                    updated=row[7]
-                ) for row in cursor
-            ]
+        async with self.db.execute(query, (after, rank_threshold, origin)) as cursor:
+            async for row in cursor:
+                results.append(
+                    Document(
+                        id=row[0],
+                        path=row[1],
+                        origin=row[2],
+                        score=row[3],
+                        vector=row[4],
+                        processed=row[5],
+                        created=row[6],
+                        updated=row[7]
+                    )
+                )
+
+        return results
 
     async def _delete_docs(self, ids: list[str]):
         placeholders = ",".join(["?" for _ in ids])
         query = f'''
         UPDATE
             document
-        SET processed = TRUE
-        SET updated = CURRENT_TIMESTAMP
+        SET processed = TRUE,
+        updated = CURRENT_TIMESTAMP
         WHERE id IN ({placeholders})
         '''
 
@@ -106,9 +111,9 @@ class DocumentGateway(StorageGateway):
                 else:
                     log.info("Document processing success")
                     log.info("Deleting docs from the queue")
-                    await self._delete_docs([doc.id for docs in self.to_process for doc in docs])
+                    await self._delete_docs([doc.id for docs in s.to_process for doc in docs])
 
-                    for doc in self.to_process:
+                    for doc in s.to_process:
                         try:
                             remove(doc.path)
                         except:
