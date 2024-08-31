@@ -68,22 +68,27 @@ class PDFGateway(StorageGateway):
         if limit:
             query += f"\n LIMIT {limit}"
 
+        results = []
+
         async with self.db.execute(query) as cursor:
-            return [
-                PDF(
-                    id=row[0],
-                    path=row[1],
-                    url=row[2],
-                    title=row[3],
-                    score=row[4],
-                    error=row[5],
-                    created=row[6],
-                    updated=row[7],
-                    processed=row[8],
-                    origin=row[9]
+            async for row in cursor:
+                results.append(
+                    PDF(
+                        id=row[0],
+                        path=row[1],
+                        url=row[2],
+                        title=row[3],
+                        score=row[4],
+                        error=row[5],
+                        created=row[6],
+                        updated=row[7],
+                        processed=row[8],
+                        origin=row[9]
+                    )
                 )
-                for row in cursor
-            ]
+        
+        return results
+            
 
     async def download_pdf(self, url: str, origin: str, sem: Optional[Semaphore] = None, title: str = None, score: int = None):
         log.info(f"Downloading PDF {url}")

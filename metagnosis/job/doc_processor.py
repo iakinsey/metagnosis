@@ -25,10 +25,12 @@ class DocumentProcessorJob(Job):
         self.limit = limit
 
     async def perform(self):
-        async with await self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:
+        async with self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:
             loop = get_running_loop()
 
-            await gather(*(loop.run_in_executor(p.hydrate_text) for p in pdfs))
+            await gather(*(
+                loop.run_in_executor(self.text_executor, p.hydrate_text) for p in pdfs
+            ))
             await self.process_documents({
                 p.id: Document.from_pdf(p) for p in pdfs
             })

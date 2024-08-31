@@ -23,6 +23,6 @@ class PDF(BaseModel):
         with open_pdf(self.path) as f:
             for page_num in range(len(f)):
                 page = f[page_num]
-                text += page.text()
+                text += page.get_text()
 
         self.text = text 

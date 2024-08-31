@@ -41,8 +41,8 @@ async def main():
     #llm = LLMGateway()
     jobs = [
         #ArxivProcessorJob(pdf),
-        HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
-        #DocumentProcessorJob(document, pdf, encoder, 10),
+        #HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
+        DocumentProcessorJob(document, pdf, encoder, 10),
         #PublisherJob(document)
     ]
 

@@ -43,4 +43,4 @@ class StorageGateway(ABC):
                 await self.db.commit()
             except Exception as e:
                 await self.db.rollback()
-            raise e
+                raise e
