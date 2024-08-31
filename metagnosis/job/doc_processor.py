@@ -36,13 +36,9 @@ class DocumentProcessorJob(Job):
             })
 
     async def process_documents(self, documents: dict[str, Document]):
-        log.info("Encoding documents")
-
         encodings = await self.encoder.encode([(d.id, d.text) for d in documents.values()])
 
         for id, vector in encodings:
             documents[id].vector = vector
-
-        log.info("Encoding complete")
 
         await self.document.save_documents([d for d in documents.values()])

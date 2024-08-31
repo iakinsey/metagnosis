@@ -12,6 +12,9 @@ class EncoderGateway:
         self.pool = ThreadPoolExecutor(max_workers=4)
 
     async def encode(self, values: List[Tuple[str, str]]) -> List[Tuple[str, List[float]]]:
+        if not values:
+            return []
+
         log.info(f"Encoding {len(values)} entities")
 
         loop = get_running_loop()
