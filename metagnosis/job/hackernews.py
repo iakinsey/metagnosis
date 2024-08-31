@@ -1,10 +1,11 @@
-from asyncio import gather
+from asyncio import gather, wait_for, CancelledError, TimeoutError
 from datetime import datetime
 from hashlib import sha256
 from os.path import join
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright, Browser
+from playwright._impl._errors import TargetClosedError
 from trafilatura import extract
 from .base import Job
 from ..gateway.pdf import PDFGateway
@@ -13,6 +14,7 @@ from ..models.pdf import PDF
 
 
 class HackerNewsProcessorJob(Job):
+    REQUEST_TIMEOUT = 120
     storage_path: str
     user_agent: str
     pdf: PDFGateway
@@ -48,9 +50,19 @@ class HackerNewsProcessorJob(Job):
                 if not processed 
             ))
 
-        await self.pdf.upsert_pages([i for i in pages if i])
+        log.info("Pages gathered, upserting")
+        await self.pdf.upsert_pdfs([i for i in pages if i])
 
-    async def process_entity(self, browser: Browser, id: str, title: str, url: str, comment: int, needs_update: bool) -> PDF:
+    async def process_entity(self, *args) -> PDF:
+        try:
+            return await wait_for(self._process_entity(*args), timeout=self.REQUEST_TIMEOUT)
+        except TimeoutError:
+            return None
+
+    async def _process_entity(self, browser: Browser, id: str, title: str, url: str, comment: int, needs_update: bool) -> PDF:
+        if url.startswith("item?id="):
+            url = "https://news.ycombinator.com/" + url
+
         log.info(f"Processing entity {url}")
 
         if url.endswith(".pdf"):
@@ -61,9 +73,14 @@ class HackerNewsProcessorJob(Job):
         if needs_update:
             return self.update_page(id, title, url, comment)
 
-        return await self.new_page(browser, id, title, url, comment)
+        try:
+            return await self.new_page(browser, id, title, url, comment)
+        except (TargetClosedError, CancelledError):
+            return None
 
     def update_page(self, id: str, title: str, url: str, comment: int) -> PDF:
+        log.info(f"Updating page {url}")
+
         now = datetime.now()
 
         return PDF(
@@ -79,16 +96,25 @@ class HackerNewsProcessorJob(Job):
         )
 
     async def new_page(self, browser: Browser, id: str, title: str, url: str, comment: int) -> PDF:
+        log.info(f"Fetching page {url}")
+
         page = await browser.new_page()
         err = None
 
         try:
             await page.goto(url)
+            await page.wait_for_load_state()
         except Exception as e:
             err = str(e)
 
         now = datetime.now()
-        path = await self.screenshot_page()
+
+        try:
+            path = await self.screenshot_page(page, id)
+        except Exception as e:
+            log.error("Failed to screenshot page", exc_info=True)
+
+            return None
 
         return PDF(
             id=id,
@@ -104,9 +130,15 @@ class HackerNewsProcessorJob(Job):
         )
     
     async def screenshot_page(self, page, id) -> str:
+        log.info(f"Screenshotting page {id}")
+
         path = join(self.storage_path, id)
         old_html = await page.evaluate("document.body.innerHTML")
-        new_html = extract(old_html, include_images=True, output_format='html')
+        try:
+            new_html = extract(old_html, include_images=True, output_format='html')
+        except:
+            extracted = extract(old_html)
+            new_html = ''.join(f'<p>{line}</p>' for line in extracted.split('\n'))
 
         await page.evaluate("""
             (newBodyHtml) => {
@@ -121,7 +153,7 @@ class HackerNewsProcessorJob(Job):
                 window.location.href = dataUrl;
             }
         """, new_html)
-
+        await page.wait_for_load_state()
         await page.pdf(path=path)
 
         return path

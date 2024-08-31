@@ -171,7 +171,9 @@ class PDFGateway(StorageGateway):
 
         await self.db.execute(query, (title, score, url))
 
-    async def upesrt_pdf(self, pdfs: list[PDF]):
+    async def upsert_pdfs(self, pdfs: list[PDF]):
+        log.info("Upserting pdfs")
+
         query = """
             INSERT INTO pdf
             (id, path, url, title, score, error, created, updated, processed, origin)
@@ -181,7 +183,7 @@ class PDFGateway(StorageGateway):
                 title = excluded.title,
                 score = excluded.score,
                 updated = CURRENT_TIMESTAMP
-            WHERE Page.processed = 0
+            WHERE pdf.processed = 0
         """
         rows = [(
             pdf.id,

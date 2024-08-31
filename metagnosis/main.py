@@ -40,8 +40,8 @@ async def main():
     encoder = EncoderGateway()
     #llm = LLMGateway()
     jobs = [
-        ArxivProcessorJob(pdf),
-        #HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
+        #ArxivProcessorJob(pdf),
+        HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
         #DocumentProcessorJob(document, pdf, encoder, 10),
         #PublisherJob(document)
     ]
