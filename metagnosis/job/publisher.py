@@ -124,6 +124,9 @@ class PublisherJob(Job):
             "shipping_level": self.publish_creds.shipping_level
         }
 
+        print("publishing book")
+        return
+
         async with ClientSession() as session:
             async with session.post(url, headers=headers, data=dumps(payload)) as response:
                 try:
