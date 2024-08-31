@@ -28,6 +28,6 @@ class Document(BaseModel):
             score=0,
             processed=False,
             text=pdf.text,
-            created=now(),
-            updated=now()
+            created=now,
+            updated=now
         )
