@@ -26,7 +26,7 @@ class Document(BaseModel):
             path=pdf.path,
             data_type="pdf",
             origin=pdf.origin,
-            score=0,
+            score=pdf.score or 0,
             processed=False,
             text=pdf.text,
             created=now,

@@ -61,6 +61,10 @@ class PublisherJob(Job):
 
         async with await self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
+
+            if not docs:
+                return
+
             cover_page_path = self.get_cover_page()
             body = self.merge_pdfs(docs)
             cover_path = await self.upload_to_s3(cover_page_path)
@@ -215,7 +219,7 @@ class PublisherJob(Job):
 
     def get_relevant_docs(self, docs_multi) -> list[Document]:
         hn_docs, arxiv_docs = docs_multi
-        arxiv_docs = self.filter_arxiv_docs(arxiv_docs)
+        arxiv_docs = self.filter_arxiv_docs(arxiv_docs) if arxiv_docs else []
 
         return hn_docs + arxiv_docs
 
@@ -241,7 +245,7 @@ class PublisherJob(Job):
             clusters=clusters
         )
     
-    def get_intersting_arxiv_papers(self, arxiv: ArxivClusters) -> set[str]:
+    def get_interesting_arxiv_papers(self, arxiv: ArxivClusters) -> set[str]:
         centers = arxiv.kmeans.cluster_centers_
         labels = arxiv.kmeans.labels_
         distances = cdist(arxiv.vectors, centers, 'euclidean')
