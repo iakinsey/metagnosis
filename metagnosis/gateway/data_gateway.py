@@ -36,8 +36,6 @@ class StorageGateway(ABC):
     @asynccontextmanager
     async def transaction(self):
         async with self.process_lock:
-            #await self.db.execute("BEGIN TRANSACTION")
-
             try:
                 yield
                 await self.db.commit()

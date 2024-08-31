@@ -96,7 +96,7 @@ class DocumentGateway(StorageGateway):
 
         class GetDocumentsForProcessingMulti:
             async def __aenter__(s) -> List[List[Document]]:
-                await self.transaction().__aenter__()
+                await self.process_lock.acquire()
                 log.info("Retrieving documents from the queue for processing")
                 s.to_process = []
 
@@ -106,19 +106,22 @@ class DocumentGateway(StorageGateway):
                 return to_process
 
             async def __aexit__(s, exc_type, exc_val, exc_tb):
-                if exc_type is None:
-                    log.info("Document processing failed")
-                else:
-                    log.info("Document processing success")
-                    log.info("Deleting docs from the queue")
-                    await self._delete_docs([doc.id for docs in s.to_process for doc in docs])
+                try:
+                    if exc_type is None:
+                        log.info("Document processing success")
+                        await self._delete_docs([doc.id for docs in s.to_process for doc in docs])
 
-                    for doc in s.to_process:
-                        try:
-                            remove(doc.path)
-                        except:
-                            pass
-
-                await self.transaction().__aexit__(exc_type, exc_val, exc_tb)
+                        for doc in s.to_process:
+                            try:
+                                remove(doc.path)
+                            except:
+                                pass
+                    else:
+                        log.info("Document processing failed")
+                        await self.db.rollback()
+                        raise exc_val
+ 
+                finally:
+                    self.process_lock.release()
             
         return GetDocumentsForProcessingMulti()
