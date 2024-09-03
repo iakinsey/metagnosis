@@ -5,6 +5,7 @@ from sqlite_vec import serialize_float32
 from .data_gateway import StorageGateway
 from ..log import log
 from ..models.document import Document
+from ..util.data import deserialize_float32
 
 
 class DocumentGateway(StorageGateway):
@@ -51,7 +52,6 @@ class DocumentGateway(StorageGateway):
             id, path, origin, score, vector, processed, created, updated
         FROM document
         WHERE processed = FALSE
-        AND created > ?
         AND score >= ?
         AND origin = ?
         ORDER BY score DESC
@@ -62,16 +62,17 @@ class DocumentGateway(StorageGateway):
         
         results = []
 
-        async with self.db.execute(query, (after, rank_threshold, origin)) as cursor:
+        async with self.db.execute(query, (rank_threshold, origin)) as cursor:
             async for row in cursor:
                 results.append(
                     Document(
                         id=row[0],
                         path=row[1],
                         origin=row[2],
+                        data_type="pdf",
                         score=row[3],
-                        vector=row[4],
-                        processed=row[5],
+                        vector=deserialize_float32(row[4]),
+                        processed=bool(row[5]),
                         created=row[6],
                         updated=row[7]
                     )
@@ -91,7 +92,7 @@ class DocumentGateway(StorageGateway):
 
         await self.db.execute(query, ids)
 
-    async def get_documents_for_processing_multi(self, args_multi):
+    def get_documents_for_processing_multi(self, args_multi):
         to_process = []
 
         class GetDocumentsForProcessingMulti:

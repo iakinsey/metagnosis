@@ -59,7 +59,7 @@ class PublisherJob(Job):
             ("arxiv", self.last_run_time, 0, None)
         ]
 
-        async with await self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
+        async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
 
             if not docs:

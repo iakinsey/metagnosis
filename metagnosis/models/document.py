@@ -10,12 +10,10 @@ class Document(BaseModel):
     data_type: str
     path: str
     score: int
-    categories: List[str]
     vector: List[float]
     processed: bool
     created: datetime
     updated: datetime
-    text: str
 
     @classmethod
     def from_pdf(cls, pdf: PDF):

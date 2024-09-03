@@ -9,7 +9,6 @@ from sqlite_vec import loadable_path
 from .config import get_config
 from .gateway.document import DocumentGateway
 from .gateway.encoder import EncoderGateway
-#from .gateway.llm import LLMGateway
 from .gateway.pdf import PDFGateway
 from .job.arxiv import ArxivProcessorJob
 from .job.hackernews import HackerNewsProcessorJob
