@@ -234,7 +234,7 @@ class PublisherJob(Job):
         ids = list(data.keys())
         vectors = np.array(list(data.values()))
         clusters = len(TOPICS)
-        kmeans = KMeans(n_clusters=clusters, random_state=56)
+        kmeans = KMeans(n_clusters=clusters, random_state=56, n_init=10)
 
         kmeans.fit(vectors)
 
@@ -248,16 +248,17 @@ class PublisherJob(Job):
     def get_interesting_arxiv_papers(self, arxiv: ArxivClusters) -> set[str]:
         centers = arxiv.kmeans.cluster_centers_
         labels = arxiv.kmeans.labels_
+        centroids = arxiv.kmeans.cluster_centers_
         distances = cdist(arxiv.vectors, centers, 'euclidean')
         ids = set()
 
         for i in range(arxiv.clusters):
             # Novelty
             indices = np.where(labels == i)[0]
-            vectors = vectors[indices]
-            inner_distances = cdist(vectors, vectors, 'euclidean')
-            avg_distances = np.mean(inner_distances, axis=1)
-            novel_index = np.argmax(avg_distances)
+            vectors = arxiv.vectors[indices]
+
+            distances_to_centroid = np.linalg.norm(vectors - centroids[i], axis=1)
+            novel_index = np.argmax(distances_to_centroid)
             ids.add(arxiv.ids[indices[novel_index]])
 
             # Centrality

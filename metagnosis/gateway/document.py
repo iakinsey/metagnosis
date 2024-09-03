@@ -1,11 +1,12 @@
+import numpy as np
+
 from datetime import datetime
+from json import dumps, loads
 from os import remove
 from typing import List
-from sqlite_vec import serialize_float32
 from .data_gateway import StorageGateway
 from ..log import log
 from ..models.document import Document
-from ..util.data import deserialize_float32
 
 
 class DocumentGateway(StorageGateway):
@@ -35,7 +36,7 @@ class DocumentGateway(StorageGateway):
             d.path,
             d.origin,
             d.score,
-            serialize_float32(d.vector),
+            dumps(d.vector.tolist()),
             d.processed,
             d.created,
             d.updated
@@ -71,7 +72,7 @@ class DocumentGateway(StorageGateway):
                         origin=row[2],
                         data_type="pdf",
                         score=row[3],
-                        vector=deserialize_float32(row[4]),
+                        vector=np.array(loads(row[4])),
                         processed=bool(row[5]),
                         created=row[6],
                         updated=row[7]
