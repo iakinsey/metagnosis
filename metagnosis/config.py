@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from os import getcwd, makedirs
 from os.path import join
+from typing import Optional
 
 data_path = join(getcwd(), "data")
 
@@ -22,6 +23,7 @@ class Config(BaseModel):
     db_path: str = join(data_path, "mg.db")
     job_path: str = join(data_path, "jobs.db")
     user_agent: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    proxy: Optional[str] = None
     lulu_auth: str
     aws_access_key_id: str
     aws_secret_access_key: str

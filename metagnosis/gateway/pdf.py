@@ -110,8 +110,8 @@ class PDFGateway(StorageGateway):
 
         headers = {'User-Agent': self.config.user_agent}
 
-        async with ClientSession(headers=headers) as client:
-            async with client.get(url) as response:
+        async with ClientSession() as client:
+            async with client.get(url, headers=headers, proxy=self.config.proxy) as response:
                 response.raise_for_status()
                 log.info(f"Saving {url} to {path}")
 

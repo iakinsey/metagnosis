@@ -31,8 +31,8 @@ class HackerNewsProcessorJob(Job):
     async def perform(self):
         headers = {'User-Agent': self.config.user_agent}
 
-        async with ClientSession(headers=headers) as session:
-            async with session.get(self.hn_url) as resp:
+        async with ClientSession() as session:
+            async with session.get(self.hn_url, headers=headers, proxy=self.config.proxy) as resp:
                 html = await resp.text()
 
         soup = BeautifulSoup(html, "html.parser")

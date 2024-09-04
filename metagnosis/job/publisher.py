@@ -42,7 +42,6 @@ class PublisherJob(Job):
     aws_secret_access_key: str
     s3_bucket: str
     publish_creds: PublishCredentials
-    user_agent: str
 
     def __init__(self, document: DocumentGateway):
         config = get_config()
@@ -53,7 +52,6 @@ class PublisherJob(Job):
         self.s3_bucket = config.s3_bucket
         self.publish_creds = config.publish_creds
         self.lulu_auth = config.lulu_auth
-        self.user_agent = config.user_agent
  
     async def perform(self):
         args_multi = [
@@ -83,10 +81,9 @@ class PublisherJob(Job):
         data = {
             'grant_type': 'client_credentials'
         }
-        headers = {'User-Agent': self.user_agent}
 
-        async with ClientSession(headers=headers) as session:
-            async with session.post(url, headers=headers, data=data) as response:
+        async with ClientSession() as session:
+            async with session.post(url, proxy=self.config.proxy, headers=headers, data=data) as response:
                 return await response.json()['access_token']
 
     async def publish_book(self, cover_path: str, body_path: str) -> str:
@@ -134,9 +131,7 @@ class PublisherJob(Job):
         print("publishing book")
         return
 
-        headers = {'User-Agent': self.user_agent}
-
-        async with ClientSession(headers=headers) as session:
+        async with ClientSession() as session:
             async with session.post(url, headers=headers, data=dumps(payload)) as response:
                 try:
                     response.raise_for_status()

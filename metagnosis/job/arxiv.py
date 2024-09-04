@@ -42,8 +42,8 @@ class ArxivProcessorJob(Job):
 
         headers = {'User-Agent': self.config.user_agent}
 
-        async with ClientSession(headers=headers) as client:
-            async with client.get(url) as resp:
+        async with ClientSession() as client:
+            async with client.get(url, headers=headers, proxy=self.config.proxy) as resp:
                 text = await resp.text()
         
         urls = await self.extract_pdf_urls(text)
