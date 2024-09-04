@@ -18,7 +18,7 @@ from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 from .base import Job
 from .arxiv import TOPICS
-from ..config import get_config, PublishCredentials
+from ..config import get_config, Config, PublishCredentials
 from ..gateway.document import DocumentGateway
 from ..gateway.image_gen import ImageGenerationGateway
 from ..models.document import Document
@@ -42,6 +42,7 @@ class PublisherJob(Job):
     aws_secret_access_key: str
     s3_bucket: str
     publish_creds: PublishCredentials
+    user_agent: str
 
     def __init__(self, document: DocumentGateway):
         config = get_config()
@@ -52,6 +53,7 @@ class PublisherJob(Job):
         self.s3_bucket = config.s3_bucket
         self.publish_creds = config.publish_creds
         self.lulu_auth = config.lulu_auth
+        self.user_agent = config.user_agent
  
     async def perform(self):
         args_multi = [
@@ -81,8 +83,9 @@ class PublisherJob(Job):
         data = {
             'grant_type': 'client_credentials'
         }
+        headers = {'User-Agent': self.user_agent}
 
-        async with ClientSession() as session:
+        async with ClientSession(headers=headers) as session:
             async with session.post(url, headers=headers, data=data) as response:
                 return await response.json()['access_token']
 
@@ -131,7 +134,9 @@ class PublisherJob(Job):
         print("publishing book")
         return
 
-        async with ClientSession() as session:
+        headers = {'User-Agent': self.user_agent}
+
+        async with ClientSession(headers=headers) as session:
             async with session.post(url, headers=headers, data=dumps(payload)) as response:
                 try:
                     response.raise_for_status()

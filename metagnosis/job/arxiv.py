@@ -2,6 +2,7 @@ from asyncio import gather, Semaphore
 from aiohttp import ClientSession
 from feedparser import parse
 from .base import Job
+from ..config import get_config, Config
 from ..log import log
 from ..gateway.encoder import EncoderGateway
 from ..gateway.pdf import PDFGateway
@@ -18,9 +19,11 @@ TOPICS = [
 class ArxivProcessorJob(Job):
     pdf: PDFGateway
     download_limit: int = 10
+    config: Config
 
     def __init__(self, pdf: PDFGateway):
-        self.pdf = pdf 
+        self.config = get_config()
+        self.pdf = pdf
  
     async def perform(self):
         await gather(*(
@@ -37,7 +40,9 @@ class ArxivProcessorJob(Job):
     async def _process_rss(self, topic: str):
         url = URL_TEMPLATE.format(topic)
 
-        async with ClientSession() as client:
+        headers = {'User-Agent': self.config.user_agent}
+
+        async with ClientSession(headers=headers) as client:
             async with client.get(url) as resp:
                 text = await resp.text()
         

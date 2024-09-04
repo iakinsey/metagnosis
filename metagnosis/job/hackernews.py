@@ -8,6 +8,7 @@ from playwright.async_api import async_playwright, Browser
 from playwright._impl._errors import TargetClosedError
 from trafilatura import extract
 from .base import Job
+from ..config import get_config, Config
 from ..gateway.pdf import PDFGateway
 from ..log import log
 from ..models.pdf import PDF
@@ -18,15 +19,19 @@ class HackerNewsProcessorJob(Job):
     storage_path: str
     user_agent: str
     pdf: PDFGateway
+    config: Config
 
     def __init__(self, storage_path: str, user_agent: str, pdf: PDFGateway):
         self.storage_path = storage_path
         self.pdf = pdf
         self.user_agent = user_agent
         self.hn_url = "https://news.ycombinator.com/"
+        self.config = get_config()
 
     async def perform(self):
-        async with ClientSession() as session:
+        headers = {'User-Agent': self.config.user_agent}
+
+        async with ClientSession(headers=headers) as session:
             async with session.get(self.hn_url) as resp:
                 html = await resp.text()
 
