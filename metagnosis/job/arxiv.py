@@ -1,5 +1,6 @@
 from asyncio import gather, Semaphore
 from aiohttp import ClientSession
+from aiohttp.client_exceptions import ServerDisconnectedError
 from feedparser import parse
 from .base import Job
 from ..config import get_config, Config
@@ -42,9 +43,15 @@ class ArxivProcessorJob(Job):
 
         headers = {'User-Agent': self.config.user_agent}
 
-        async with ClientSession() as client:
-            async with client.get(url, headers=headers, proxy=self.config.proxy) as resp:
-                text = await resp.text()
+        for _ in range(self.config.fetch_retries):
+            try:
+                async with ClientSession() as client:
+                    async with client.get(url, headers=headers, proxy=self.config.proxy) as resp:
+                        text = await resp.text()
+                
+                break
+            except ServerDisconnectedError:
+                pass
         
         urls = await self.extract_pdf_urls(text)
         sem = Semaphore(self.download_limit)

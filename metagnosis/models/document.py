@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from .pdf import PDF
 
@@ -11,6 +11,7 @@ class Document(BaseModel):
     path: str
     score: int
     vector: List[float]
+    text: Optional[str] = None
     processed: bool
     created: datetime
     updated: datetime

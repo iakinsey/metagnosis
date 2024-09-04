@@ -1,10 +1,12 @@
 from asyncio import Semaphore
 from contextlib import asynccontextmanager
 from datetime import datetime
+from os import remove
 from os.path import join
 from typing import AsyncGenerator, List, Optional
 from uuid import uuid4
 from aiohttp import ClientSession
+from aiohttp.client_exceptions import ClientResponseError, ServerDisconnectedError
 from aiofiles import open
 from .data_gateway import StorageGateway
 from ..models.pdf import PDF
@@ -110,14 +112,35 @@ class PDFGateway(StorageGateway):
 
         headers = {'User-Agent': self.config.user_agent}
 
-        async with ClientSession() as client:
-            async with client.get(url, headers=headers, proxy=self.config.proxy) as response:
-                response.raise_for_status()
-                log.info(f"Saving {url} to {path}")
+        for _ in range(self.config.fetch_retries):
+            try:
+                async with ClientSession() as client:
+                    async with client.get(url, headers=headers, proxy=self.config.proxy) as response:
+                        response.raise_for_status()
+                        log.info(f"Saving {url} to {path}")
 
-                async with open(path, 'wb') as f:
-                    async for chunk in response.content.iter_any():
-                        await f.write(chunk)
+                        async with open(path, 'wb') as f:
+                            async for chunk in response.content.iter_any():
+                                await f.write(chunk)
+                    
+                break
+            except ServerDisconnectedError:
+                pass
+            except ClientResponseError as e:
+                if e.status == 404:
+                    log.info(f"{url} 404")
+                    return
+
+
+        if not await self.is_pdf(path):
+            log.info(f"{url} is not PDF, skipping")
+
+            try:
+                remove(path)
+            except:
+                pass
+
+            return
 
         await self.add_pdf(
             PDF(
@@ -132,6 +155,12 @@ class PDFGateway(StorageGateway):
                 processed=False
             )
         )
+
+    async def is_pdf(self, path):
+        async with open(path, 'rb') as f:
+            signature = await f.read(5)
+
+            return signature == b'%PDF-'
 
     async def pdf_exists(self, url) -> bool:
         query = '''

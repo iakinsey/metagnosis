@@ -81,6 +81,9 @@ class DocumentGateway(StorageGateway):
 
         return results
 
+    async def delete_doc(self, id):
+        await self._delete_docs([id])
+
     async def _delete_docs(self, ids: list[str]):
         placeholders = ",".join(["?" for _ in ids])
         query = f'''

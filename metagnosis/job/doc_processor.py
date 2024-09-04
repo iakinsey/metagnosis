@@ -1,5 +1,6 @@
 from asyncio import as_completed, gather, get_running_loop
 from concurrent.futures import ThreadPoolExecutor
+from os import remove
 from typing import List, Tuple
 from .base import Job
 from ..gateway.encoder import EncoderGateway
@@ -31,6 +32,7 @@ class DocumentProcessorJob(Job):
             await gather(*[
                 loop.run_in_executor(self.text_executor, p.hydrate_text) for p in pdfs
             ])
+
             await self.process_documents({
                 p.id: Document.from_pdf(p) for p in pdfs
             })
