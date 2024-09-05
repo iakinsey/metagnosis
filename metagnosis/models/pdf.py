@@ -25,4 +25,4 @@ class PDF(BaseModel):
                 page = f[page_num]
                 text += page.get_text()
 
-        self.text = text 
+        self.text = text

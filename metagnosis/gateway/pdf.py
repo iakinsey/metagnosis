@@ -14,7 +14,7 @@ from ..log import log
 
 
 class PDFGateway(StorageGateway):
-    SCHEMA = '''
+    SCHEMA = """
         CREATE TABLE IF NOT EXISTS pdf (
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
@@ -31,10 +31,12 @@ class PDFGateway(StorageGateway):
         CREATE INDEX IF NOT EXISTS idx_pdf_processed ON PDF (processed);
         CREATE INDEX IF NOT EXISTS idx_pdf_created ON PDF (created);
         CREATE INDEX IF NOT EXISTS idx_pdf_url ON PDF (url);
-    '''
+    """
 
     @asynccontextmanager
-    async def get_pdfs_for_processing(self, limit=None) -> AsyncGenerator[List[PDF], None]:
+    async def get_pdfs_for_processing(
+        self, limit=None
+    ) -> AsyncGenerator[List[PDF], None]:
         async with self.transaction():
             log.info("Retrieving pdfs from the queue for processing")
             pdfs = await self._get_pdfs(limit=limit)
@@ -45,19 +47,19 @@ class PDFGateway(StorageGateway):
             await self._delete_pdfs([i.id for i in pdfs])
 
     async def _delete_pdfs(self, ids: list[str]):
-        placeholders = ','.join(['?' for _ in ids])
-        query = f'''
+        placeholders = ",".join(["?" for _ in ids])
+        query = f"""
         UPDATE
             pdf
         SET processed = TRUE,
         updated = CURRENT_TIMESTAMP
         WHERE id IN ({placeholders})
-        '''
+        """
 
         await self.db.execute(query, ids)
 
     async def _get_pdfs(self, limit=None) -> List[PDF]:
-        query = '''
+        query = """
             SELECT
                 id, path, url, title, score, error, created, updated, processed, origin
             FROM
@@ -65,7 +67,7 @@ class PDFGateway(StorageGateway):
             WHERE
                 processed = FALSE
             ORDER BY created DESC 
-        '''
+        """
 
         if limit:
             query += f"\n LIMIT {limit}"
@@ -85,14 +87,20 @@ class PDFGateway(StorageGateway):
                         created=row[6],
                         updated=row[7],
                         processed=row[8],
-                        origin=row[9]
+                        origin=row[9],
                     )
                 )
-        
-        return results
-            
 
-    async def download_pdf(self, url: str, origin: str, sem: Optional[Semaphore] = None, title: str = None, score: int = None):
+        return results
+
+    async def download_pdf(
+        self,
+        url: str,
+        origin: str,
+        sem: Optional[Semaphore] = None,
+        title: str = None,
+        score: int = None,
+    ):
         log.info(f"Downloading PDF {url}")
 
         if await self.pdf_exists(url):
@@ -105,24 +113,28 @@ class PDFGateway(StorageGateway):
         else:
             await self._download_pdf(url, origin, title=title, score=score)
 
-    async def _download_pdf(self, url: str, origin: str, title: str = None, score: int = None):
+    async def _download_pdf(
+        self, url: str, origin: str, title: str = None, score: int = None
+    ):
         pdf_id = str(uuid4())
         path = join(self.storage_path, pdf_id)
         now = datetime.now()
 
-        headers = {'User-Agent': self.config.user_agent}
+        headers = {"User-Agent": self.config.user_agent}
 
         for _ in range(self.config.fetch_retries):
             try:
                 async with ClientSession() as client:
-                    async with client.get(url, headers=headers, proxy=self.config.proxy) as response:
+                    async with client.get(
+                        url, headers=headers, proxy=self.config.proxy
+                    ) as response:
                         response.raise_for_status()
                         log.info(f"Saving {url} to {path}")
 
-                        async with open(path, 'wb') as f:
+                        async with open(path, "wb") as f:
                             async for chunk in response.content.iter_any():
                                 await f.write(chunk)
-                    
+
                 break
             except ServerDisconnectedError:
                 pass
@@ -130,7 +142,6 @@ class PDFGateway(StorageGateway):
                 if e.status == 404:
                     log.info(f"{url} 404")
                     return
-
 
         if not await self.is_pdf(path):
             log.info(f"{url} is not PDF, skipping")
@@ -152,20 +163,20 @@ class PDFGateway(StorageGateway):
                 score=score,
                 created=now,
                 updated=now,
-                processed=False
+                processed=False,
             )
         )
 
     async def is_pdf(self, path):
-        async with open(path, 'rb') as f:
+        async with open(path, "rb") as f:
             signature = await f.read(5)
 
-            return signature == b'%PDF-'
+            return signature == b"%PDF-"
 
     async def pdf_exists(self, url) -> bool:
-        query = '''
+        query = """
             SELECT 1 FROM pdf WHERE url = ?
-        '''
+        """
 
         async with self.db.execute(query, (url,)) as cursor:
             result = await cursor.fetchone()
@@ -173,16 +184,17 @@ class PDFGateway(StorageGateway):
         return result is not None
 
     async def add_pdf(self, pdf: PDF):
-        query = '''
+        query = """
             INSERT OR IGNORE INTO pdf
             (id, path, url, title, score, error, created, updated, processed, origin)
             VALUES
             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        '''
+        """
 
         log.info(f"Saving PDF metadata {pdf.id}")
         await self.db.execute(
-            query, (
+            query,
+            (
                 pdf.id,
                 pdf.path,
                 pdf.url,
@@ -192,18 +204,18 @@ class PDFGateway(StorageGateway):
                 pdf.created,
                 pdf.updated,
                 pdf.processed,
-                pdf.origin
-            )
+                pdf.origin,
+            ),
         )
         await self.db.commit()
 
     async def update_pdf(self, url: str, title: str = None, score: int = None):
-        query = '''
+        query = """
             UPDATE pdf
             SET title = ?,
             score = ?
             WHERE url = ?
-        '''
+        """
 
         await self.db.execute(query, (title, score, url))
 
@@ -221,39 +233,42 @@ class PDFGateway(StorageGateway):
                 updated = CURRENT_TIMESTAMP
             WHERE pdf.processed = 0
         """
-        rows = [(
-            pdf.id,
-            pdf.path,
-            pdf.url,
-            pdf.title,
-            pdf.score,
-            pdf.error,
-            pdf.created,
-            pdf.updated,
-            pdf.processed,
-            pdf.origin
-        ) for pdf in pdfs]
+        rows = [
+            (
+                pdf.id,
+                pdf.path,
+                pdf.url,
+                pdf.title,
+                pdf.score,
+                pdf.error,
+                pdf.created,
+                pdf.updated,
+                pdf.processed,
+                pdf.origin,
+            )
+            for pdf in pdfs
+        ]
 
         await self.db.executemany(query, rows)
         await self.db.commit()
 
     async def get_processing_status(self, ids: list[str]) -> list[tuple[bool, bool]]:
-        query = f'''
+        query = f"""
             SELECT
             id, processed
             FROM pdf
             WHERE id IN ({",".join("?" for _ in ids)})
             AND processed = TRUE
-        '''
+        """
 
         cursor = await self.db.execute(query, ids)
         needs_update = set()
         processed = set()
 
         async for row in cursor:
-            if row['processed']:
-                needs_update.add(row['id'])
+            if row["processed"]:
+                needs_update.add(row["id"])
             else:
-                needs_update.add(row['id'])
-            
-        return [(i in needs_update, i in processed) for i in ids] 
+                needs_update.add(row["id"])
+
+        return [(i in needs_update, i in processed) for i in ids]

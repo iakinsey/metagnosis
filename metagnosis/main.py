@@ -16,6 +16,7 @@ from .job.doc_processor import DocumentProcessorJob
 from .job.publisher import PublisherJob
 from .util.job_server import JobServer
 
+
 async def main():
     config = get_config()
     conn = await connect(config.db_path)
@@ -25,34 +26,28 @@ async def main():
     await conn.enable_load_extension(True)
     await conn.load_extension(loadable_path())
     await conn.enable_load_extension(False)
-    await conn.execute('PRAGMA journal_mode=WAL;')
+    await conn.execute("PRAGMA journal_mode=WAL;")
 
-    document = await DocumentGateway.new(
-        conn,
-        config.storage_path,
-        process_lock
-    )
-    pdf = await PDFGateway.new(
-        conn,
-        config.storage_path,
-        process_lock
-    )
+    document = await DocumentGateway.new(conn, config.storage_path, process_lock)
+    pdf = await PDFGateway.new(conn, config.storage_path, process_lock)
     encoder = EncoderGateway()
     jobs = [
         ArxivProcessorJob(pdf),
         HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
         DocumentProcessorJob(document, pdf, encoder, 10),
-        PublisherJob(document)
+        PublisherJob(document),
     ]
 
     server = JobServer(job_conn, jobs)
 
     await server.start()
 
+
 def signal_handler(signum, frame):
     _exit(1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     signal(SIGTERM, signal_handler)
     signal(SIGINT, signal_handler)
 

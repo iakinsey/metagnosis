@@ -18,7 +18,13 @@ class DocumentProcessorJob(Job):
     pdf: PDFGateway
     limit: int
 
-    def __init__(self, document: DocumentGateway, pdf: PDFGateway, encoder: EncoderGateway, limit=None):
+    def __init__(
+        self,
+        document: DocumentGateway,
+        pdf: PDFGateway,
+        encoder: EncoderGateway,
+        limit=None,
+    ):
         self.document = document
         self.encoder = encoder
         self.text_executor = ThreadPoolExecutor(max_workers=25)
@@ -29,16 +35,19 @@ class DocumentProcessorJob(Job):
         async with self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:
             loop = get_running_loop()
 
-            await gather(*[
-                loop.run_in_executor(self.text_executor, p.hydrate_text) for p in pdfs
-            ])
+            await gather(
+                *[
+                    loop.run_in_executor(self.text_executor, p.hydrate_text)
+                    for p in pdfs
+                ]
+            )
 
-            await self.process_documents({
-                p.id: Document.from_pdf(p) for p in pdfs
-            })
+            await self.process_documents({p.id: Document.from_pdf(p) for p in pdfs})
 
     async def process_documents(self, documents: dict[str, Document]):
-        encodings = await self.encoder.encode([(d.id, d.text) for d in documents.values()])
+        encodings = await self.encoder.encode(
+            [(d.id, d.text) for d in documents.values()]
+        )
 
         for id, vector in encodings:
             documents[id].vector = vector

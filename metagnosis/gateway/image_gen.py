@@ -28,18 +28,27 @@ class ImageGenerationGateway:
         for _ in range(500):
             x_center, y_center = randint(0, size), randint(0, size)
             intensity = uniform(0.1, 1.0)
-            pattern_type = dominant_shape if random() < 0.7 else choice(['circle', 'stripe', 'blob'])
+            pattern_type = (
+                dominant_shape
+                if random() < 0.7
+                else choice(["circle", "stripe", "blob"])
+            )
             rotation = randint(0, 360)
             pattern_size = randint(20, 200)
 
-            if pattern_type == 'circle':
-                y, x = np.ogrid[-x_center:size-x_center, -y_center:size-y_center]
+            if pattern_type == "circle":
+                y, x = np.ogrid[
+                    -x_center : size - x_center, -y_center : size - y_center
+                ]
                 mask = x**2 + y**2 <= pattern_size**2
-            elif pattern_type == 'stripe':
+            elif pattern_type == "stripe":
                 stripe_width = randint(10, 50)
-                mask = (np.abs(y_center - np.arange(size)[:, None]) % (2 * stripe_width) < stripe_width)
+                mask = (
+                    np.abs(y_center - np.arange(size)[:, None]) % (2 * stripe_width)
+                    < stripe_width
+                )
                 mask = rotate(mask, angle=rotation, reshape=False)
-            elif pattern_type == 'blob':
+            elif pattern_type == "blob":
                 blob = np.random.random((pattern_size, pattern_size))
                 blob = gaussian_filter(blob, sigma=uniform(1, 5))
                 mask = np.zeros_like(background)
@@ -47,12 +56,14 @@ class ImageGenerationGateway:
                 y_start = max(0, y_center - blob.shape[1] // 2)
                 x_end = min(background.shape[0], x_start + blob.shape[0])
                 y_end = min(background.shape[1], y_start + blob.shape[1])
-                mask[x_start:x_end, y_start:y_end] = blob[:x_end-x_start, :y_end-y_start]
+                mask[x_start:x_end, y_start:y_end] = blob[
+                    : x_end - x_start, : y_end - y_start
+                ]
             else:
                 mask = np.zeros_like(background)
-            
+
             background += mask * intensity
-        
+
         return background % 1
 
     def warp_image(self, image: np.ndarray, intensity: float) -> np.ndarray:
@@ -70,7 +81,7 @@ class ImageGenerationGateway:
 
     def generate_random_image(self, size: int = 2048, num_colors: int = 10) -> str:
         cmap = self.generate_colormap(num_colors)
-        dominant_shape = choice(['circle', 'stripe', 'blob'])
+        dominant_shape = choice(["circle", "stripe", "blob"])
         background = self.generate_background(size, dominant_shape)
         warp_intensity = choice([0, 0.5, 1.0])
 
@@ -79,7 +90,7 @@ class ImageGenerationGateway:
 
         background = background % num_colors
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
             plt.imsave(temp_file.name, background, cmap=cmap)
             temp_file_path = temp_file.name
 

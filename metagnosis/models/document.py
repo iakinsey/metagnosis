@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from .pdf import PDF
 
+
 class Document(BaseModel):
     id: str
     path: str
@@ -29,5 +30,5 @@ class Document(BaseModel):
             processed=False,
             text=pdf.text,
             created=now,
-            updated=now
+            updated=now,
         )

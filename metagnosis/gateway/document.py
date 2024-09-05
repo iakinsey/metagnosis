@@ -10,7 +10,7 @@ from ..models.document import Document
 
 
 class DocumentGateway(StorageGateway):
-    SCHEMA = '''
+    SCHEMA = """
         CREATE TABLE IF NOT EXISTS document (
             id TEXT PRIMARY KEY,
             path TEXT NOT NULL,
@@ -21,7 +21,7 @@ class DocumentGateway(StorageGateway):
             created DATETIME NOT NULL,
             updated DATETIME NOT NULL
         );
-    '''
+    """
 
     async def save_documents(self, documents: List[Document], commit=True):
         log.info(f"Saving {len(documents)} documents")
@@ -31,24 +31,29 @@ class DocumentGateway(StorageGateway):
             (id, path, origin, score, vector, processed, created, updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
-        params = [(
-            d.id,
-            d.path,
-            d.origin,
-            d.score,
-            dumps(d.vector.tolist()),
-            d.processed,
-            d.created,
-            d.updated
-        ) for d in documents]
+        params = [
+            (
+                d.id,
+                d.path,
+                d.origin,
+                d.score,
+                dumps(d.vector.tolist()),
+                d.processed,
+                d.created,
+                d.updated,
+            )
+            for d in documents
+        ]
 
         await self.db.executemany(stmt, params)
 
         if commit:
             await self.db.commit()
 
-    async def _get_docs(self, origin: str, after: datetime, rank_threshold: int, limit: int) -> list[Document]:
-        query = '''
+    async def _get_docs(
+        self, origin: str, after: datetime, rank_threshold: int, limit: int
+    ) -> list[Document]:
+        query = """
         SELECT
             id, path, origin, score, vector, processed, created, updated
         FROM document
@@ -56,11 +61,11 @@ class DocumentGateway(StorageGateway):
         AND score >= ?
         AND origin = ?
         ORDER BY score DESC
-        '''
+        """
 
         if limit:
             query += f"\n LIMIT {limit}"
-        
+
         results = []
 
         async with self.db.execute(query, (rank_threshold, origin)) as cursor:
@@ -75,7 +80,7 @@ class DocumentGateway(StorageGateway):
                         vector=np.array(loads(row[4])),
                         processed=bool(row[5]),
                         created=row[6],
-                        updated=row[7]
+                        updated=row[7],
                     )
                 )
 
@@ -86,13 +91,13 @@ class DocumentGateway(StorageGateway):
 
     async def _delete_docs(self, ids: list[str]):
         placeholders = ",".join(["?" for _ in ids])
-        query = f'''
+        query = f"""
         UPDATE
             document
         SET processed = TRUE,
         updated = CURRENT_TIMESTAMP
         WHERE id IN ({placeholders})
-        '''
+        """
 
         await self.db.execute(query, ids)
 
@@ -114,7 +119,9 @@ class DocumentGateway(StorageGateway):
                 try:
                     if exc_type is None:
                         log.info("Document processing success")
-                        await self._delete_docs([doc.id for docs in s.to_process for doc in docs])
+                        await self._delete_docs(
+                            [doc.id for docs in s.to_process for doc in docs]
+                        )
 
                         for doc in s.to_process:
                             try:
@@ -125,8 +132,8 @@ class DocumentGateway(StorageGateway):
                         log.info("Document processing failed")
                         await self.db.rollback()
                         raise exc_val
- 
+
                 finally:
                     self.process_lock.release()
-            
+
         return GetDocumentsForProcessingMulti()

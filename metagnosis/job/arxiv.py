@@ -10,10 +10,31 @@ from ..gateway.pdf import PDFGateway
 
 URL_TEMPLATE = "https://rss.arxiv.org/rss/{}"
 TOPICS = [
-    "cs.AI", "cs.CL", "cs.CV", "cs.CY", "cs.CR", "cs.DS", "cs.DB", "cs.DL",
-    "cs.DC", "cs.ET", "cs.HC", "cs.IR", "cs.IT", "cs.LG", "cs.MA", "cs.MM",
-    "cs.NI", "cs.NE", "cs.OS", "cs.PF", "cs.PL", "cs.RO", "cs.SI", "cs.SE",
-    "cs.SD"
+    "cs.AI",
+    "cs.CL",
+    "cs.CV",
+    "cs.CY",
+    "cs.CR",
+    "cs.DS",
+    "cs.DB",
+    "cs.DL",
+    "cs.DC",
+    "cs.ET",
+    "cs.HC",
+    "cs.IR",
+    "cs.IT",
+    "cs.LG",
+    "cs.MA",
+    "cs.MM",
+    "cs.NI",
+    "cs.NE",
+    "cs.OS",
+    "cs.PF",
+    "cs.PL",
+    "cs.RO",
+    "cs.SI",
+    "cs.SE",
+    "cs.SD",
 ]
 
 
@@ -26,12 +47,9 @@ class ArxivProcessorJob(Job):
     def __init__(self, pdf: PDFGateway):
         self.config = get_config()
         self.pdf = pdf
- 
+
     async def perform(self):
-        await gather(*(
-            self.process_rss(t)
-            for t in TOPICS
-        ))
+        await gather(*(self.process_rss(t) for t in TOPICS))
 
     async def process_rss(self, topic: str):
         try:
@@ -42,25 +60,24 @@ class ArxivProcessorJob(Job):
     async def _process_rss(self, topic: str):
         url = URL_TEMPLATE.format(topic)
 
-        headers = {'User-Agent': self.config.user_agent}
+        headers = {"User-Agent": self.config.user_agent}
 
         for _ in range(self.config.fetch_retries):
             try:
                 async with ClientSession() as client:
-                    async with client.get(url, headers=headers, proxy=self.config.proxy) as resp:
+                    async with client.get(
+                        url, headers=headers, proxy=self.config.proxy
+                    ) as resp:
                         text = await resp.text()
-                
+
                 break
             except ServerDisconnectedError:
                 pass
-        
+
         urls = await self.extract_pdf_urls(text)
         sem = Semaphore(self.download_limit)
 
-        await gather(*(
-            self.pdf.download_pdf(url, "arxiv", sem)
-            for url in urls
-        ))
+        await gather(*(self.pdf.download_pdf(url, "arxiv", sem) for url in urls))
 
     async def extract_pdf_urls(self, text: str) -> list[str]:
         feed = parse(text)
@@ -72,5 +89,5 @@ class ArxivProcessorJob(Job):
             if url:
                 pdf_url = url.replace("/abs/", "/pdf/")
                 urls.append(pdf_url)
-        
+
         return urls

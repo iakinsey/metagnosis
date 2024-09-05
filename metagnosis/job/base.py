@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+
 class Job(ABC):
     INTERVAL = 60
     current: datetime

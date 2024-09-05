@@ -8,13 +8,13 @@ handler = StreamHandler(stdout)
 log: Logger = getLogger("artemis")
 
 
-handler.setFormatter(Formatter('[%(asctime)s] %(message)s'))
+handler.setFormatter(Formatter("[%(asctime)s] %(message)s"))
 log.addHandler(handler)
 log.setLevel(level)
 
 
 def log_task_exception(task):
-    formatted = ['Traceback (most recent call last):\n']
+    formatted = ["Traceback (most recent call last):\n"]
 
     for frame in task.get_stack():
         formatted.extend(format_list(extract_stack(frame)))

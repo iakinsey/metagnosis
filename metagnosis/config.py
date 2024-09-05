@@ -5,6 +5,7 @@ from typing import Optional
 
 data_path = join(getcwd(), "data")
 
+
 class PublishCredentials(BaseModel):
     email: str
     package_id: str = "0850X1100FCSTDPB080CW444GXX"
@@ -22,7 +23,9 @@ class Config(BaseModel):
     storage_path: str = data_path
     db_path: str = join(data_path, "mg.db")
     job_path: str = join(data_path, "jobs.db")
-    user_agent: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    user_agent: str = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    )
     fetch_retries: int = 4
     proxy: Optional[str] = None
     lulu_auth: str
@@ -33,7 +36,7 @@ class Config(BaseModel):
 
 
 def get_config() -> Config:
-    config_json = open(join(getcwd(), "config.json"), 'r').read().strip()
+    config_json = open(join(getcwd(), "config.json"), "r").read().strip()
     config = Config.model_validate_json(config_json)
 
     makedirs(config.storage_path, exist_ok=True)

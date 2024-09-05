@@ -53,14 +53,16 @@ class PublisherJob(Job):
         self.s3_bucket = config.s3_bucket
         self.publish_creds = config.publish_creds
         self.lulu_auth = config.lulu_auth
- 
+
     async def perform(self):
         args_multi = [
             ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit),
-            ("arxiv", self.last_run_time, 0, None)
+            ("arxiv", self.last_run_time, 0, None),
         ]
 
-        async with self.document.get_documents_for_processing_multi(args_multi) as docs_multi:
+        async with self.document.get_documents_for_processing_multi(
+            args_multi
+        ) as docs_multi:
             docs = self.get_relevant_docs(docs_multi)
 
             if not docs:
@@ -70,30 +72,30 @@ class PublisherJob(Job):
             body = self.merge_pdfs(docs)
             cover_path = await self.upload_to_s3(cover_page_path)
             body_path = await self.upload_to_s3(body.name)
-            
+
             await self.publish_book(cover_path, body_path)
 
     async def get_lulu_auth(self) -> str:
         url = "https://api.lulu.com/auth/realms/glasstree/protocol/openid-connect/token"
         headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': self.lulu_auth
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": self.lulu_auth,
         }
-        data = {
-            'grant_type': 'client_credentials'
-        }
+        data = {"grant_type": "client_credentials"}
 
         async with ClientSession() as session:
-            async with session.post(url, proxy=self.config.proxy, headers=headers, data=data) as response:
-                return await response.json()['access_token']
+            async with session.post(
+                url, proxy=self.config.proxy, headers=headers, data=data
+            ) as response:
+                return await response.json()["access_token"]
 
     async def publish_book(self, cover_path: str, body_path: str) -> str:
         auth = await self.get_lulu_auth()
         url = "https://api.lulu.com/print-jobs/"
         headers = {
-            'Authorization': f'Bearer {auth}',
-            'Cache-Control': 'no-cache',
-            'Content-Type': 'application/json'
+            "Authorization": f"Bearer {auth}",
+            "Cache-Control": "no-cache",
+            "Content-Type": "application/json",
         }
         external_id = str(uuid4())
         payload = {
@@ -103,16 +105,12 @@ class PublisherJob(Job):
                 {
                     "external_id": external_id,
                     "printable_normalization": {
-                        "cover": {
-                            "source_url": cover_path
-                        },
-                        "interior": {
-                            "source_url": body_path
-                        },
-                        "pod_package_id": self.publish_creds.package_id
+                        "cover": {"source_url": cover_path},
+                        "interior": {"source_url": body_path},
+                        "pod_package_id": self.publish_creds.package_id,
                     },
                     "quantity": 1,
-                    "title": f"Metagnosis {datetime.now().strftime('%Y-%m-%d')}"
+                    "title": f"Metagnosis {datetime.now().strftime('%Y-%m-%d')}",
                 }
             ],
             "production_delay": 120,
@@ -124,43 +122,48 @@ class PublisherJob(Job):
                 "postcode": self.publish_creds.postcode,
                 "state_code": self.publish_creds.state_code,
                 "street1": self.publish_creds.street1,
-                "street2": self.publish_creds.street2
+                "street2": self.publish_creds.street2,
             },
-            "shipping_level": self.publish_creds.shipping_level
+            "shipping_level": self.publish_creds.shipping_level,
         }
 
         async with ClientSession() as session:
-            async with session.post(url, headers=headers, data=dumps(payload)) as response:
+            async with session.post(
+                url, headers=headers, data=dumps(payload)
+            ) as response:
                 try:
                     response.raise_for_status()
                 except ClientResponseError as e:
                     error_response = await response.text()
 
-                    raise RuntimeError(f"Lulu Error: {e.status}, Details: {error_response}")
-
+                    raise RuntimeError(
+                        f"Lulu Error: {e.status}, Details: {error_response}"
+                    )
 
     async def uplodad_to_s3(self, file_name: str):
         object_name = Path(file_name).name
         session = Session(
             aws_access_key_id=self.aws_access_key_id,
-            aws_secret_access_key=self.aws_secret_access_key
+            aws_secret_access_key=self.aws_secret_access_key,
         )
-        
-        async with session.client('s3') as s3_client:
+
+        async with session.client("s3") as s3_client:
             await s3_client.upload_file(file_name, self.s3_bucket, object_name)
-        
-        await s3_client.put_object_acl(Bucket=self.s3_bucket, Key=object_name, ACL='public-read')
+
+        await s3_client.put_object_acl(
+            Bucket=self.s3_bucket, Key=object_name, ACL="public-read"
+        )
 
         presigned_url = await s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': self.s3_bucket, 'Key': object_name},
-            ExpiresIn=604800
+            "get_object",
+            Params={"Bucket": self.s3_bucket, "Key": object_name},
+            ExpiresIn=604800,
         )
 
         return presigned_url
 
     def merge_pdfs(self, docs: list[Document]) -> NamedTemporaryFile:
-        temp_file = NamedTemporaryFile(delete=True, suffix='.pdf')
+        temp_file = NamedTemporaryFile(delete=True, suffix=".pdf")
         merger = PdfMerger()
 
         for pdf_file in [d.path for d in docs]:
@@ -176,8 +179,8 @@ class PublisherJob(Job):
         image_path = self.image.generate_random_image()
 
         try:
-            start = self.last_run_time.strftime('%B %d').lstrip('0')
-            end = self.current_run_time.strftime('%B %d').lstrip('0')
+            start = self.last_run_time.strftime("%B %d").lstrip("0")
+            end = self.current_run_time.strftime("%B %d").lstrip("0")
             header_text = "Metagnosis"
             subheader_text = f"{start} - {end}"
             pdf = FPDF()
@@ -185,17 +188,17 @@ class PublisherJob(Job):
             pdf.add_page()
 
             max_font_size = 48
-            pdf.set_font("Arial", 'B', max_font_size)
+            pdf.set_font("Arial", "B", max_font_size)
             text_width = pdf.get_string_width(header_text)
             page_width = pdf.w - 20
 
             while text_width > page_width:
                 max_font_size -= 1
-                pdf.set_font("Arial", 'B', max_font_size)
+                pdf.set_font("Arial", "B", max_font_size)
                 text_width = pdf.get_string_width(header_text)
 
             pdf.cell(0, max_font_size / 2, header_text, ln=True, align="L")
-            pdf.set_font("Arial", 'I', 18)
+            pdf.set_font("Arial", "I", 18)
             pdf.cell(0, 15, subheader_text, ln=True, align="L")
             pdf.ln(30)
 
@@ -236,18 +239,13 @@ class PublisherJob(Job):
 
         kmeans.fit(vectors)
 
-        return ArxivClusters(
-            ids=ids,
-            vectors=vectors,
-            kmeans=kmeans,
-            clusters=clusters
-        )
-    
+        return ArxivClusters(ids=ids, vectors=vectors, kmeans=kmeans, clusters=clusters)
+
     def get_interesting_arxiv_papers(self, arxiv: ArxivClusters) -> set[str]:
         centers = arxiv.kmeans.cluster_centers_
         labels = arxiv.kmeans.labels_
         centroids = arxiv.kmeans.cluster_centers_
-        distances = cdist(arxiv.vectors, centers, 'euclidean')
+        distances = cdist(arxiv.vectors, centers, "euclidean")
         ids = set()
 
         for i in range(arxiv.clusters):
@@ -260,7 +258,7 @@ class PublisherJob(Job):
             ids.add(arxiv.ids[indices[novel_index]])
 
             # Centrality
-            index = np.argmin(distances[:, i]) 
+            index = np.argmin(distances[:, i])
             ids.add(arxiv.ids[index])
 
-        return ids 
+        return ids

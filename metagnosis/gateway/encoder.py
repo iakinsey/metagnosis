@@ -11,7 +11,9 @@ class EncoderGateway:
         self.model = SentenceTransformer(self.model_name)
         self.pool = ThreadPoolExecutor(max_workers=4)
 
-    async def encode(self, values: List[Tuple[str, str]]) -> List[Tuple[str, List[float]]]:
+    async def encode(
+        self, values: List[Tuple[str, str]]
+    ) -> List[Tuple[str, List[float]]]:
         if not values:
             return []
 
@@ -21,10 +23,6 @@ class EncoderGateway:
         ids = [i[0] for i in values]
         strings = [i[1] for i in values]
 
-        result = await loop.run_in_executor(
-            self.pool,
-            self.model.encode,
-            strings 
-        )
+        result = await loop.run_in_executor(self.pool, self.model.encode, strings)
 
         return list(zip(ids, result.tolist()))

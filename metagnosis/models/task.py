@@ -16,7 +16,9 @@ class Task:
     error: Optional[Exception]
 
     @classmethod
-    async def wrap(cls, coro: Coroutine[Any, Any, Any], category: TaskCategory, id: str = None):
+    async def wrap(
+        cls, coro: Coroutine[Any, Any, Any], category: TaskCategory, id: str = None
+    ):
         params = {
             "id": id,
             "category": category,
