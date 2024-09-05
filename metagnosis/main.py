@@ -42,7 +42,7 @@ async def main():
         ArxivProcessorJob(pdf),
         HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
         DocumentProcessorJob(document, pdf, encoder, 10),
-        #PublisherJob(document)
+        PublisherJob(document)
     ]
 
     server = JobServer(job_conn, jobs)

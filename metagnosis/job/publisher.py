@@ -33,6 +33,7 @@ class ArxivClusters(BaseModel):
 
 
 class PublisherJob(Job):
+    INTERVAL = 604800
     document: DocumentGateway
     hn_limit: int = 25
     arxiv_limit: int = 25
@@ -127,9 +128,6 @@ class PublisherJob(Job):
             },
             "shipping_level": self.publish_creds.shipping_level
         }
-
-        print("publishing book")
-        return
 
         async with ClientSession() as session:
             async with session.post(url, headers=headers, data=dumps(payload)) as response:

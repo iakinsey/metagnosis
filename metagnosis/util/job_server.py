@@ -55,7 +55,7 @@ class JobServer:
         SELECT
             name, next_run_time
         FROM job
-        WHERE next_run_time >= ?
+        WHERE next_run_time <= ?
         '''
 
         results = []
