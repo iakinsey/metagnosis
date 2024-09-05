@@ -5,6 +5,7 @@ VENV_DIR = .env
 build:
 	python3 -m venv $(VENV_DIR)
 	$(VENV_DIR)/bin/pip install --upgrade pip
+	$(VENV_DIR)/bin/pip install -r requirements.txt
 
 archive:
 	git ls-files | tar -czf metagnosis.tar.gz --transform 's,^,metagnosis/,' -T -
