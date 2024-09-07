@@ -1,5 +1,6 @@
 from asyncio import as_completed, gather, get_running_loop
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 from os import remove
 from typing import List, Tuple
 from .base import Job
@@ -12,6 +13,7 @@ from ..models.task import Task, TaskCategory
 
 
 class DocumentProcessorJob(Job):
+    INTERVAL = 1
     document: DocumentGateway
     encoder: EncoderGateway
     text_executor: ThreadPoolExecutor
@@ -23,13 +25,12 @@ class DocumentProcessorJob(Job):
         document: DocumentGateway,
         pdf: PDFGateway,
         encoder: EncoderGateway,
-        limit=None,
     ):
+        self.limit = cpu_count() * 2
         self.document = document
         self.encoder = encoder
-        self.text_executor = ThreadPoolExecutor(max_workers=25)
+        self.text_executor = ThreadPoolExecutor(max_workers=self.limit)
         self.pdf = pdf
-        self.limit = limit
 
     async def perform(self):
         async with self.pdf.get_pdfs_for_processing(limit=self.limit) as pdfs:

@@ -37,7 +37,9 @@ class DocumentGateway(StorageGateway):
                 d.path,
                 d.origin,
                 d.score,
-                dumps(d.vector.tolist()),
+                dumps(
+                    d.vector.tolist() if isinstance(d.vector, np.ndarray) else d.vector
+                ),
                 d.processed,
                 d.created,
                 d.updated,
@@ -118,6 +120,7 @@ class DocumentGateway(StorageGateway):
             async def __aexit__(s, exc_type, exc_val, exc_tb):
                 try:
                     if exc_type is None:
+                        return
                         log.info("Document processing success")
                         await self._delete_docs(
                             [doc.id for docs in s.to_process for doc in docs]
@@ -128,6 +131,8 @@ class DocumentGateway(StorageGateway):
                                 remove(doc.path)
                             except:
                                 pass
+
+                        await self.db.commit()
                     else:
                         log.info("Document processing failed")
                         await self.db.rollback()

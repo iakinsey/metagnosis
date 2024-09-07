@@ -34,7 +34,7 @@ async def main():
     jobs = [
         ArxivProcessorJob(pdf),
         HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
-        DocumentProcessorJob(document, pdf, encoder, 10),
+        DocumentProcessorJob(document, pdf, encoder),
         PublisherJob(document),
     ]
 

@@ -3,7 +3,7 @@ from json import dumps
 from os import remove
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -23,6 +23,9 @@ from ..gateway.document import DocumentGateway
 from ..gateway.image_gen import ImageGenerationGateway
 from ..models.document import Document
 
+LULU_TEST = "https://api.sandbox.lulu.com"
+LULU_PROD = "https://api.lulu.com"
+
 
 class ArxivClusters(BaseModel):
     ids: list[str]
@@ -34,6 +37,7 @@ class ArxivClusters(BaseModel):
 
 class PublisherJob(Job):
     INTERVAL = 604800
+    API_PREFIX = LULU_PROD
     document: DocumentGateway
     hn_limit: int = 25
     arxiv_limit: int = 25
@@ -43,6 +47,7 @@ class PublisherJob(Job):
     aws_secret_access_key: str
     s3_bucket: str
     publish_creds: PublishCredentials
+    proxy: Optional[str]
 
     def __init__(self, document: DocumentGateway):
         config = get_config()
@@ -53,6 +58,7 @@ class PublisherJob(Job):
         self.s3_bucket = config.s3_bucket
         self.publish_creds = config.publish_creds
         self.lulu_auth = config.lulu_auth
+        self.proxy = config.proxy
 
     async def perform(self):
         args_multi = [
@@ -76,7 +82,7 @@ class PublisherJob(Job):
             await self.publish_book(cover_path, body_path)
 
     async def get_lulu_auth(self) -> str:
-        url = "https://api.lulu.com/auth/realms/glasstree/protocol/openid-connect/token"
+        url = self.API_PREFIX + "/auth/realms/glasstree/protocol/openid-connect/token"
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Authorization": self.lulu_auth,
@@ -85,13 +91,14 @@ class PublisherJob(Job):
 
         async with ClientSession() as session:
             async with session.post(
-                url, proxy=self.config.proxy, headers=headers, data=data
+                url, proxy=self.proxy, headers=headers, data=data
             ) as response:
-                return await response.json()["access_token"]
+                payload = await response.json()
+                return payload["access_token"]
 
     async def publish_book(self, cover_path: str, body_path: str) -> str:
         auth = await self.get_lulu_auth()
-        url = "https://api.lulu.com/print-jobs/"
+        url = self.API_PREFIX + "/print-jobs/"
         headers = {
             "Authorization": f"Bearer {auth}",
             "Cache-Control": "no-cache",
@@ -132,6 +139,7 @@ class PublisherJob(Job):
                 url, headers=headers, data=dumps(payload)
             ) as response:
                 try:
+                    payload = await response.json()
                     response.raise_for_status()
                 except ClientResponseError as e:
                     error_response = await response.text()
@@ -140,7 +148,7 @@ class PublisherJob(Job):
                         f"Lulu Error: {e.status}, Details: {error_response}"
                     )
 
-    async def uplodad_to_s3(self, file_name: str):
+    async def upload_to_s3(self, file_name: str):
         object_name = Path(file_name).name
         session = Session(
             aws_access_key_id=self.aws_access_key_id,
@@ -150,9 +158,7 @@ class PublisherJob(Job):
         async with session.client("s3") as s3_client:
             await s3_client.upload_file(file_name, self.s3_bucket, object_name)
 
-        await s3_client.put_object_acl(
-            Bucket=self.s3_bucket, Key=object_name, ACL="public-read"
-        )
+        # await s3_client.put_object(Bucket=self.s3_bucket, Key=object_name)
 
         presigned_url = await s3_client.generate_presigned_url(
             "get_object",
@@ -245,7 +251,7 @@ class PublisherJob(Job):
         centers = arxiv.kmeans.cluster_centers_
         labels = arxiv.kmeans.labels_
         centroids = arxiv.kmeans.cluster_centers_
-        distances = cdist(arxiv.vectors, centers, "euclidean")
+        # distances = cdist(arxiv.vectors, centers, "euclidean")
         ids = set()
 
         for i in range(arxiv.clusters):
@@ -258,7 +264,7 @@ class PublisherJob(Job):
             ids.add(arxiv.ids[indices[novel_index]])
 
             # Centrality
-            index = np.argmin(distances[:, i])
-            ids.add(arxiv.ids[index])
+            # index = np.argmin(distances[:, i])
+            # ids.add(arxiv.ids[index])
 
         return ids

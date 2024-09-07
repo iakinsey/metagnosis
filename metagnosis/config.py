@@ -17,6 +17,7 @@ class PublishCredentials(BaseModel):
     country_code: str
     postcode: str
     phone_number: str
+    shipping_level: str
 
 
 class Config(BaseModel):
