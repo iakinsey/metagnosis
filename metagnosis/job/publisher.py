@@ -140,7 +140,6 @@ class PublisherJob(Job):
                 url, headers=headers, data=dumps(payload)
             ) as response:
                 try:
-                    payload = await response.json()
                     response.raise_for_status()
                 except ClientResponseError as e:
                     error_response = await response.text()
@@ -204,7 +203,7 @@ class PublisherJob(Job):
             end = self.current_run_time.strftime("%B %d").lstrip("0")
             header_text = "Metagnosis"
             subheader_text = f"{start} - {end}"
-            pdf = FPDF()
+            pdf = FPDF(format="letter")
 
             pdf.add_page()
 

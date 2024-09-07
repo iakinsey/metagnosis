@@ -39,7 +39,7 @@ TOPICS = [
 
 
 class ArxivProcessorJob(Job):
-    INTERVAL = 1
+    INTERVAL = 180
     pdf: PDFGateway
     download_limit: int = 10
     config: Config

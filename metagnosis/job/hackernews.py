@@ -15,7 +15,7 @@ from ..models.pdf import PDF
 
 
 class HackerNewsProcessorJob(Job):
-    INTERVAL = 1
+    INTERVAL = 60
     REQUEST_TIMEOUT = 120
     storage_path: str
     user_agent: str
