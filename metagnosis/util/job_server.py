@@ -46,11 +46,12 @@ class JobServer:
         WHERE job.next_run_time < excluded.next_run_time;
         """
 
-        now = datetime.now()
-        dt = now + timedelta(seconds=job.INTERVAL)
+        dt = datetime.now() + timedelta(seconds=job.INTERVAL)
         next_run_time = int(dt.timestamp())
 
-        await self.db.execute(query, (job.__class__.__name__, next_run_time, now))
+        await self.db.execute(
+            query, (job.__class__.__name__, next_run_time, int(dt.timestamp()))
+        )
         await self.db.commit()
 
     async def get_jobs_to_run(self) -> list[tuple[Job, datetime]]:

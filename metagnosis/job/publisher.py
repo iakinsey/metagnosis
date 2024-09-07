@@ -12,7 +12,8 @@ from aioboto3 import Session
 from aiohttp import ClientResponseError, ClientSession
 from fpdf import FPDF
 from PIL import Image
-from PyPDF2 import PdfMerger
+from PyPDF2 import PdfMerger, PdfReader, PdfWriter
+from PyPDF2.generic import RectangleObject
 from pydantic import BaseModel, ConfigDict
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
@@ -158,8 +159,6 @@ class PublisherJob(Job):
         async with session.client("s3") as s3_client:
             await s3_client.upload_file(file_name, self.s3_bucket, object_name)
 
-        # await s3_client.put_object(Bucket=self.s3_bucket, Key=object_name)
-
         presigned_url = await s3_client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self.s3_bucket, "Key": object_name},
@@ -179,7 +178,23 @@ class PublisherJob(Job):
         merger.close()
         temp_file.seek(0)
 
-        return temp_file
+        reader = PdfReader(temp_file)
+        writer = PdfWriter()
+
+        letter_size = RectangleObject([0, 0, 612, 792])
+
+        for page in reader.pages:
+            page.mediabox = letter_size
+            writer.add_page(page)
+
+        resized_temp_file = NamedTemporaryFile(delete=True, suffix=".pdf")
+
+        with open(resized_temp_file.name, "wb") as f:
+            writer.write(f)
+
+        resized_temp_file.seek(0)
+
+        return resized_temp_file
 
     def get_cover_page(self) -> str:
         image_path = self.image.generate_random_image()
