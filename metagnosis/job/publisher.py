@@ -1,3 +1,6 @@
+from asyncio import create_subprocess_exec
+from asyncio.subprocess import PIPE
+from bisect import insort
 from datetime import datetime
 from json import dumps
 from os import remove
@@ -11,6 +14,7 @@ import numpy as np
 from aioboto3 import Session
 from aiohttp import ClientResponseError, ClientSession
 from fpdf import FPDF
+from pikepdf import open as pikepdf_open
 from PIL import Image
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
 from PyPDF2.generic import RectangleObject
@@ -22,6 +26,7 @@ from .arxiv import TOPICS
 from ..config import get_config, Config, PublishCredentials
 from ..gateway.document import DocumentGateway
 from ..gateway.image_gen import ImageGenerationGateway
+from ..log import log
 from ..models.document import Document
 
 LULU_TEST = "https://api.sandbox.lulu.com"
@@ -63,7 +68,7 @@ class PublisherJob(Job):
 
     async def perform(self):
         args_multi = [
-            ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit),
+            # ("Hacker News", self.last_run_time, self.hn_rank_threshold, self.hn_limit),
             ("arxiv", self.last_run_time, 0, None),
         ]
 
@@ -75,12 +80,18 @@ class PublisherJob(Job):
             if not docs:
                 return
 
-            cover_page_path = self.get_cover_page()
-            body = self.merge_pdfs(docs)
-            cover_path = await self.upload_to_s3(cover_page_path)
-            body_path = await self.upload_to_s3(body.name)
+            start, end = self.get_times(docs_multi)
+            cover_page_path = self.get_cover_page(start, end)
+            body_file_path = await self.merge_pdfs(docs)
 
-            await self.publish_book(cover_path, body_path)
+            try:
+                cover_path = await self.upload_to_s3(cover_page_path)
+                body_path = await self.upload_to_s3(body_file_path)
+
+                await self.publish_book(cover_path, body_path)
+            finally:
+                remove(cover_page_path)
+                remove(body_file_path)
 
     async def get_lulu_auth(self) -> str:
         url = self.API_PREFIX + "/auth/realms/glasstree/protocol/openid-connect/token"
@@ -166,41 +177,91 @@ class PublisherJob(Job):
 
         return presigned_url
 
-    def merge_pdfs(self, docs: list[Document]) -> NamedTemporaryFile:
+    async def merge_pdfs(self, docs: list[Document]) -> NamedTemporaryFile:
         temp_file = NamedTemporaryFile(delete=True, suffix=".pdf")
-        merger = PdfMerger()
 
-        for pdf_file in [d.path for d in docs]:
-            merger.append(pdf_file)
+        try:
+            merger = PdfMerger()
 
-        merger.write(temp_file)
-        merger.close()
-        temp_file.seek(0)
+            for pdf_file in [d.path for d in docs]:
+                merger.append(pdf_file)
 
-        reader = PdfReader(temp_file)
-        writer = PdfWriter()
+            merger.write(temp_file)
+            merger.close()
+            temp_file.seek(0)
 
-        letter_size = RectangleObject([0, 0, 612, 792])
+            reader = PdfReader(temp_file)
+            writer = PdfWriter()
+            letter_size = RectangleObject([0, 0, 612, 792])
 
-        for page in reader.pages:
-            page.mediabox = letter_size
-            writer.add_page(page)
+            for page in reader.pages:
+                page.mediabox = letter_size
+                page.trimbox = letter_size
+                page.crobox = letter_size
+                page.bleedbox = letter_size
 
-        resized_temp_file = NamedTemporaryFile(delete=True, suffix=".pdf")
+                writer.add_page(page)
 
-        with open(resized_temp_file.name, "wb") as f:
-            writer.write(f)
+            resized_temp_file = NamedTemporaryFile(suffix=".pdf")
 
-        resized_temp_file.seek(0)
+            with open(resized_temp_file.name, "wb") as f:
+                writer.write(f)
 
-        return resized_temp_file
+            resized_temp_file.seek(0)
 
-    def get_cover_page(self) -> str:
+            return await self.fix_pdf(resized_temp_file.name)
+        finally:
+            remove(temp_file.name)
+
+    async def fix_pdf(self, path: str) -> str:
+        try:
+            output_path = NamedTemporaryFile(suffix=".pdf").name
+
+            with pikepdf_open(path) as pdf:
+                pdf.save(
+                    output_path,
+                    fix_metadata_version=True,
+                    compress_streams=True,
+                    normalize_content=True,
+                )
+
+            return await self.ghostscript_fix(output_path)
+        finally:
+            remove(path)
+
+    async def ghostscript_fix(self, input_path: str):
+        output_path = NamedTemporaryFile(suffix=".pdf").name
+        cmd = [
+            "gs",
+            "-dBATCH",
+            "-dNOPAUSE",
+            "-q",
+            "-sDEVICE=pdfwrite",
+            f"-sOutputFile={output_path}",
+            f"{input_path}",
+        ]
+
+        try:
+            process = await create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = await process.communicate()
+
+            log.info(stdout)
+
+            if process.returncode != 0:
+                err = stderr.decode()
+                log.error(f"Ghostscript error: {err}")
+                raise RuntimeError(err)
+        finally:
+            remove(input_path)
+
+        return output_path
+
+    def get_cover_page(self, start: datetime, end: datetime) -> str:
         image_path = self.image.generate_random_image()
 
         try:
-            start = self.last_run_time.strftime("%B %d").lstrip("0")
-            end = self.current_run_time.strftime("%B %d").lstrip("0")
+            start = start.strftime("%B %d").lstrip("0")
+            end = end.strftime("%B %d").lstrip("0")
             header_text = "Metagnosis"
             subheader_text = f"{start} - {end}"
             pdf = FPDF(format="letter")
@@ -238,11 +299,22 @@ class PublisherJob(Job):
 
         return temp_file.name
 
+    def get_times(self, docs_multi) -> tuple[datetime, datetime]:
+        dates = []
+
+        for doc_group in docs_multi:
+            for document in doc_group:
+                insort(dates, document.created)
+
+        return dates[0], dates[-1]
+
     def get_relevant_docs(self, docs_multi) -> list[Document]:
-        hn_docs, arxiv_docs = docs_multi
+        # hn_docs, arxiv_docs = docs_multi
+        (arxiv_docs,) = docs_multi
         arxiv_docs = self.filter_arxiv_docs(arxiv_docs) if arxiv_docs else []
 
-        return hn_docs + arxiv_docs
+        # return hn_docs + arxiv_docs
+        return arxiv_docs
 
     def filter_arxiv_docs(self, docs: list[Document]):
         arxiv = self.get_arxiv_cluster(docs)

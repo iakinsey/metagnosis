@@ -32,9 +32,9 @@ async def main():
     pdf = await PDFGateway.new(conn, config.storage_path, process_lock)
     encoder = EncoderGateway()
     jobs = [
-        ArxivProcessorJob(pdf),
-        HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
-        DocumentProcessorJob(document, pdf, encoder),
+        # ArxivProcessorJob(pdf),
+        # HackerNewsProcessorJob(config.storage_path, config.user_agent, pdf),
+        # DocumentProcessorJob(document, pdf, encoder),
         PublisherJob(document),
     ]
 

@@ -45,7 +45,7 @@ class JobServer:
         DO UPDATE SET next_run_time = excluded.next_run_time
         WHERE job.next_run_time < excluded.next_run_time;
         """
-
+        return
         dt = datetime.now() + timedelta(seconds=job.INTERVAL)
         next_run_time = int(dt.timestamp())
 
