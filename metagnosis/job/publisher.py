@@ -81,7 +81,7 @@ class PublisherJob(Job):
                 return
 
             start, end = self.get_times(docs_multi)
-            cover_page_path = self.get_cover_page(start, end)
+            cover_page_path = await self.get_cover_page(start, end)
             body_file_path = await self.merge_pdfs(docs)
 
             try:
@@ -256,7 +256,7 @@ class PublisherJob(Job):
 
         return output_path
 
-    def get_cover_page(self, start: datetime, end: datetime) -> str:
+    async def get_cover_page(self, start: datetime, end: datetime) -> str:
         image_path = self.image.generate_random_image()
 
         try:
@@ -264,40 +264,63 @@ class PublisherJob(Job):
             end = end.strftime("%B %d").lstrip("0")
             header_text = "Metagnosis"
             subheader_text = f"{start} - {end}"
-            pdf = FPDF(format="letter")
 
+            document_width = 1302.408
+            document_height = 810
+
+            pdf = FPDF(unit="pt", format=(document_width, document_height))
             pdf.add_page()
+
+            trim_width = 612
+            trim_height = 792
+            trim_x_offset = document_width - trim_width
+            trim_y_offset = (document_height - trim_height) / 2
 
             max_font_size = 48
             pdf.set_font("Arial", "B", max_font_size)
             text_width = pdf.get_string_width(header_text)
-            page_width = pdf.w - 20
+            page_width = trim_width - 2 * 36
 
             while text_width > page_width:
                 max_font_size -= 1
                 pdf.set_font("Arial", "B", max_font_size)
                 text_width = pdf.get_string_width(header_text)
 
-            pdf.cell(0, max_font_size / 2, header_text, ln=True, align="L")
+            pdf.set_xy(trim_x_offset + 36, trim_y_offset + 50)
+            pdf.cell(trim_width - 72, max_font_size, header_text, ln=True, align="C")
+
             pdf.set_font("Arial", "I", 18)
-            pdf.cell(0, 15, subheader_text, ln=True, align="L")
-            pdf.ln(30)
+            pdf.set_xy(trim_x_offset + 36, trim_y_offset + 100)
+            pdf.cell(trim_width - 72, 30, subheader_text, ln=True, align="C")
 
             image = Image.open(image_path)
             img_width, img_height = image.size
-            max_size = min(pdf.w, pdf.h)
-            side_length = min(max_size, min(img_width, img_height))
-            x = (pdf.w - side_length) / 2
-            y = pdf.h - side_length
+            img_aspect = img_width / img_height
 
-            pdf.image(image_path, x=x, y=y, w=side_length, h=side_length)
+            max_image_width = trim_width - 72
+            max_image_height = trim_height - 200
+
+            if img_width > max_image_width or img_height > max_image_height:
+                if img_aspect > (max_image_width / max_image_height):
+                    new_width = max_image_width
+                    new_height = max_image_width / img_aspect
+                else:
+                    new_height = max_image_height
+                    new_width = max_image_height * img_aspect
+            else:
+                new_width, new_height = img_width, img_height
+
+            x = trim_x_offset + (trim_width - new_width) / 2
+            y = trim_y_offset + 150
+
+            pdf.image(image_path, x=x, y=y, w=new_width, h=new_height)
 
             temp_file = NamedTemporaryFile(delete=False, suffix=".pdf")
             pdf.output(temp_file.name)
         finally:
             remove(image_path)
 
-        return temp_file.name
+        return await self.fix_pdf(temp_file.name)
 
     def get_times(self, docs_multi) -> tuple[datetime, datetime]:
         dates = []
