@@ -237,6 +237,10 @@ class PublisherJob(Job):
             "-dNOPAUSE",
             "-q",
             "-sDEVICE=pdfwrite",
+            "-dPDFSETTINGS=/prepress",
+            "-dEmbedAllFonts=true",
+            "-dSubsetFonts=true",
+            "-dCompressFonts=true",
             f"-sOutputFile={output_path}",
             f"{input_path}",
         ]

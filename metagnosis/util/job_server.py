@@ -45,7 +45,7 @@ class JobServer:
         DO UPDATE SET next_run_time = excluded.next_run_time
         WHERE job.next_run_time < excluded.next_run_time;
         """
-        return
+
         dt = datetime.now() + timedelta(seconds=job.INTERVAL)
         next_run_time = int(dt.timestamp())
 
@@ -98,3 +98,5 @@ class JobServer:
         except Exception as e:
             log.info(f"Failed to execute job {job.__class__.__name__}")
             log.exception(e)
+        else:
+            log.info(f"Finished executing job {job.__class__.__name__}")
